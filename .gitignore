@@ -6,3 +6,4 @@ config.yaml
 .DS_Store
 groups.json
 data/
+.claude/
