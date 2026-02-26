@@ -50,13 +50,24 @@ function getFormatter(config: ServiceConfig): FormatProvider | null {
   return cache.format.get(key)!;
 }
 
+export interface InboundResult {
+  /** Whether AI formatting was applied to the message text */
+  formatApplied?: boolean;
+  /** Original message text before formatting (only set when formatting changed it) */
+  formatOriginalText?: string;
+  /** If formatting failed, the error message — signals the request should be cancelled */
+  formatError?: string;
+}
+
 /**
  * Process inbound message:
  * 1. If audio + STT configured → transcribe to text
  * 2. If format configured → run AI formatting on text
- * Mutates the message in place.
+ * Mutates the message in place. Returns format processing info.
  */
-export async function processInbound(message: UnifiedMessage, serviceConfig: ServiceConfig): Promise<void> {
+export async function processInbound(message: UnifiedMessage, serviceConfig: ServiceConfig): Promise<InboundResult> {
+  const result: InboundResult = {};
+
   // Step 1: STT — transcribe audio to text
   if (message.type === 'audio' && serviceConfig.stt && message.media?.buffer) {
     const stt = getSTT(serviceConfig);
@@ -83,17 +94,23 @@ export async function processInbound(message: UnifiedMessage, serviceConfig: Ser
     if (formatter) {
       try {
         console.log(`[format] Formatting message ${message.id} with ${serviceConfig.format.provider}...`);
+        const originalText = message.text;
         const formatted = await formatter.format(message.text, serviceConfig.format.prompt);
         if (formatted) {
           console.log(`[format] Result: "${formatted.substring(0, 80)}${formatted.length > 80 ? '...' : ''}"`);
           message.text = formatted;
+          result.formatApplied = true;
+          result.formatOriginalText = originalText;
         }
-      } catch (err) {
-        console.error(`[format] Formatting failed for message ${message.id}:`, err);
-        // On error, keep original text (graceful degradation)
+      } catch (err: any) {
+        const errMsg = err?.message || String(err);
+        console.error(`[format] Formatting failed for message ${message.id}:`, errMsg);
+        result.formatError = errMsg.substring(0, 300);
       }
     }
   }
+
+  return result;
 }
 
 export interface OutboundResult {

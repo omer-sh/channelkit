@@ -81,7 +81,9 @@ export class ResendChannel extends Channel {
    * Called by ApiServer when POST /inbound/resend/<channelName> is hit.
    */
   handleInbound(payload: any): void {
-    const unified = this.toUnified(payload);
+    // Resend webhook events wrap email data under `data`
+    const emailData = payload.data || payload;
+    const unified = this.toUnified(emailData);
     if (unified) {
       this.emitMessage(unified);
     }

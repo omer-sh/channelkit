@@ -20,6 +20,13 @@ function StatusBadge({ status }) {
         <span className="text-xs font-bold">Error</span>
       </div>
     );
+  if (status === 'format-error')
+    return (
+      <div className="flex items-center gap-1.5 text-red">
+        <span className="material-symbols-outlined text-[18px]">format_color_reset</span>
+        <span className="text-xs font-bold">Format Error</span>
+      </div>
+    );
   if (status === 'blocked')
     return (
       <div className="flex items-center gap-1.5 text-yellow">
@@ -35,10 +42,18 @@ function StatusBadge({ status }) {
   );
 }
 
-function AllowActions({ entry }) {
+/** Extract a readable phone number from a JID like "306947976772@s.whatsapp.net" → "+306947976772" */
+function toPhoneNumber(sender) {
+  const digits = sender.replace(/@.*$/, '').replace(/[^0-9]/g, '');
+  return digits ? '+' + digits : sender;
+}
+
+function AllowActions({ entry, onToast }) {
   const [adding, setAdding] = useState(null);
   const [done, setDone] = useState(false);
   const { channels, services } = useAppState();
+
+  const phoneNumber = toPhoneNumber(entry.from);
 
   const channelName = Object.keys(channels).find(
     name => name === entry.channel || channels[name].type === entry.channel
@@ -53,13 +68,14 @@ function AllowActions({ entry }) {
     setAdding('channel');
     try {
       const ch = channels[channelName];
-      const newList = [...(ch.allow_list || []), entry.from];
+      const newList = [...(ch.allow_list || []), phoneNumber];
       await fetch(API + '/api/config/channels/' + encodeURIComponent(channelName), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ allow_list: newList }),
       });
       setDone(true);
+      onToast?.(`${phoneNumber} added to ${channelName} allow list. Restart to apply changes.`);
     } catch {}
     setAdding(null);
   }
@@ -68,13 +84,14 @@ function AllowActions({ entry }) {
     const svc = services[svcName];
     setAdding(svcName);
     try {
-      const newList = [...(svc.allow_list || []), entry.from];
+      const newList = [...(svc.allow_list || []), phoneNumber];
       await fetch(API + '/api/config/services/' + encodeURIComponent(svcName), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ webhook: svc.webhook, allow_list: newList }),
       });
       setDone(true);
+      onToast?.(`${phoneNumber} added to ${svcName} allow list. Restart to apply changes.`);
     } catch {}
     setAdding(null);
   }
@@ -85,7 +102,7 @@ function AllowActions({ entry }) {
     return (
       <div className="flex items-center gap-2 text-green text-sm">
         <span className="material-symbols-outlined text-[18px]">check_circle</span>
-        <span className="font-medium">{entry.from} added to allow list</span>
+        <span className="font-medium">{phoneNumber} added to allow list</span>
       </div>
     );
   }
@@ -118,7 +135,7 @@ function AllowActions({ entry }) {
   );
 }
 
-function LogRow({ entry, isNew }) {
+function LogRow({ entry, isNew, onToast }) {
   const [expanded, setExpanded] = useState(false);
   const icon = channelIcons[entry.channel] || null;
   const typeLabel = entry.type === 'async-outbound'
@@ -174,15 +191,23 @@ function LogRow({ entry, isNew }) {
                 <div><label className="text-[11px] text-dim uppercase block mb-0.5">Status</label><p className="text-sm">{entry.status}</p></div>
                 <div><label className="text-[11px] text-dim uppercase block mb-0.5">Latency</label><p className="text-sm">{entry.latency != null ? entry.latency + 'ms' : '\u2014'}</p></div>
               </div>
+              {entry.formatApplied && entry.formatOriginalText && (
+                <div>
+                  <label className="text-[11px] text-dim uppercase block mb-1">Original Message <span className="text-primary font-normal normal-case">(before formatting)</span></label>
+                  <div className="bg-surface border border-border rounded-lg p-3 text-sm whitespace-pre-wrap">{entry.formatOriginalText}</div>
+                </div>
+              )}
               <div>
-                <label className="text-[11px] text-dim uppercase block mb-1">Full Message</label>
+                <label className="text-[11px] text-dim uppercase block mb-1">
+                  {entry.formatApplied ? <>Formatted Message <span className="inline-flex items-center ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">AI Formatted</span></> : 'Full Message'}
+                </label>
                 <div className="bg-surface border border-border rounded-lg p-3 text-sm whitespace-pre-wrap">{entry.text || '\u2014'}</div>
               </div>
               <div>
                 <label className="text-[11px] text-dim uppercase block mb-1">Response</label>
                 <div className="bg-surface border border-border rounded-lg p-3 text-sm whitespace-pre-wrap">{entry.responseText || '\u2014'}</div>
               </div>
-              {entry.status === 'blocked' && <AllowActions entry={entry} />}
+              {entry.status === 'blocked' && <AllowActions entry={entry} onToast={onToast} />}
             </div>
           </td>
         </tr>
@@ -199,6 +224,14 @@ export default function Logs({ onSend }) {
   const [page, setPage] = useState(1);
   const searchTimeout = useRef(null);
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [toast, setToast] = useState(null);
+  const toastTimeout = useRef(null);
+
+  const showToast = useCallback((msg) => {
+    setToast(msg);
+    clearTimeout(toastTimeout.current);
+    toastTimeout.current = setTimeout(() => setToast(null), 6000);
+  }, []);
 
   useEffect(() => {
     fetch(API + '/api/logs')
@@ -294,7 +327,7 @@ export default function Logs({ onSend }) {
           </thead>
           <tbody className="divide-y divide-border/50">
             {paginated.map((e, i) => (
-              <LogRow key={e.id || i} entry={e} isNew={i === 0 && page === 1 && entries[0]?.id === e.id} />
+              <LogRow key={e.id || i} entry={e} isNew={i === 0 && page === 1 && entries[0]?.id === e.id} onToast={showToast} />
             ))}
           </tbody>
         </table>
@@ -328,6 +361,36 @@ export default function Logs({ onSend }) {
               Next
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 bg-surface border border-yellow/40 rounded-xl shadow-lg animate-slide-up">
+          <span className="material-symbols-outlined text-yellow text-[20px]">restart_alt</span>
+          <span className="text-sm text-text">{toast}</span>
+          <button
+            onClick={async () => {
+              if (!confirm('Restart ChannelKit now?\n\nThe process will restart and the dashboard will reload automatically.')) return;
+              setToast('Restarting\u2026');
+              try { await fetch(API + '/api/restart', { method: 'POST' }); } catch {}
+              let attempts = 0;
+              const poll = setInterval(async () => {
+                attempts++;
+                if (attempts > 30) { clearInterval(poll); setToast('Restart timed out — reload manually'); return; }
+                try {
+                  const r = await fetch(API + '/api/health');
+                  if (r.ok) { clearInterval(poll); location.reload(); }
+                } catch {}
+              }, 1000);
+            }}
+            className="px-3 py-1 bg-yellow text-white rounded-lg text-xs font-bold hover:opacity-90 transition-opacity whitespace-nowrap"
+          >
+            Restart Now
+          </button>
+          <button onClick={() => setToast(null)} className="text-dim hover:text-text">
+            <span className="material-symbols-outlined text-[16px]">close</span>
+          </button>
         </div>
       )}
     </div>

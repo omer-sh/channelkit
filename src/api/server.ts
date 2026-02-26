@@ -142,6 +142,7 @@ export class ApiServer {
   set mcpStatus(fn: (() => { active: boolean; url: string | null }) | undefined) { this.ctx.mcpStatus = fn; }
   set updateStatus(fn: (() => Promise<any>) | undefined) { this.ctx.updateStatus = fn; }
   set updateTrigger(fn: (() => Promise<any>) | undefined) { this.ctx.updateTrigger = fn; }
+  set reloadRouter(fn: (() => void) | undefined) { this.ctx.reloadRouter = fn; }
   setExposeMcp(value: boolean): void { this.ctx.setExposeMcp(value); }
   broadcast(msg: any): void { this.ctx.broadcast(msg); }
   getExpressApp() { return this.app; }

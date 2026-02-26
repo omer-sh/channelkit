@@ -7,9 +7,9 @@ const inputCls = 'w-full py-2 px-3 border border-border rounded-lg text-sm bg-bg
 const selectCls = 'py-2 px-3 border border-border rounded-lg text-sm bg-bg-light text-text focus:outline-none focus:border-primary';
 
 const modelsByProvider = {
-  openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo', 'o3-mini', 'o1', 'o1-mini'],
-  anthropic: ['claude-sonnet-4-20250514', 'claude-opus-4-20250514', 'claude-haiku-4-20250514', 'claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022'],
-  google: ['gemini-2.0-flash', 'gemini-2.0-pro', 'gemini-1.5-flash', 'gemini-1.5-pro'],
+  openai: ['gpt-4.1-nano', 'gpt-4.1-mini', 'gpt-4.1', 'gpt-4o', 'gpt-4o-mini', 'o3-mini', 'o4-mini'],
+  anthropic: ['claude-sonnet-4-20250514', 'claude-haiku-4-20250514', 'claude-opus-4-20250514'],
+  google: ['gemini-2.5-flash', 'gemini-3-flash', 'gemini-3.1-pro', 'gemini-2.0-flash-lite'],
 };
 
 function ModelCombobox({ value, onChange, provider }) {
@@ -129,7 +129,7 @@ function AudioSettingsRow({ name, svc, settings, onClose, loadConfig }) {
       const res = await fetch(API + '/api/config/services/' + encodeURIComponent(name), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ webhook: svc.webhook, code: svc.code || null, command: svc.command || null, stt: sttVal, tts: ttsVal, format: svc.format || null }),
+        body: JSON.stringify({ webhook: svc.webhook, method: svc.method || 'POST', auth: svc.auth || null, code: svc.code || null, command: svc.command || null, stt: sttVal, tts: ttsVal, format: svc.format || null }),
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Save failed');
       setStatus('Saved');
@@ -180,7 +180,7 @@ function FormatSettingsRow({ name, svc, settings, onClose, loadConfig }) {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          webhook: svc.webhook, code: svc.code || null, command: svc.command || null,
+          webhook: svc.webhook, method: svc.method || 'POST', auth: svc.auth || null, code: svc.code || null, command: svc.command || null,
           stt: svc.stt || null, tts: svc.tts || null, format: formatVal,
         }),
       });
@@ -329,12 +329,23 @@ function ServiceRowWithAudio({ name, svc, loadConfig, settings, audioTarget, set
   const [webhook, setWebhook] = useState(svc.webhook);
   const [code, setCode] = useState(svc.code || '');
   const [command, setCommand] = useState(svc.command || '');
+  const [webhookMethod, setWebhookMethod] = useState(svc.method || 'POST');
+  const [authType, setAuthType] = useState(svc.auth?.type || '');
+  const [authToken, setAuthToken] = useState(svc.auth?.token || '');
+  const [authHeaderName, setAuthHeaderName] = useState(svc.auth?.header_name || '');
+  const [authHeaderValue, setAuthHeaderValue] = useState(svc.auth?.header_value || '');
   const [editAllowListEnabled, setEditAllowListEnabled] = useState(!!(svc.allow_list?.length));
   const [editAllowListText, setEditAllowListText] = useState((svc.allow_list || []).join(', '));
   const [showExample, setShowExample] = useState(false);
   const showAudio = audioTarget === name;
   const isEndpoint = channels[svc.channel]?.type === 'endpoint';
   const isPhoneChannel = ['whatsapp', 'sms', 'voice'].includes(channels[svc.channel]?.type);
+
+  function buildAuthPayload() {
+    if (authType === 'bearer' && authToken) return { type: 'bearer', token: authToken };
+    if (authType === 'header' && authHeaderName && authHeaderValue) return { type: 'header', header_name: authHeaderName, header_value: authHeaderValue };
+    return null;
+  }
 
   async function save() {
     if (!webhook) { alert('Webhook URL is required'); return; }
@@ -344,7 +355,7 @@ function ServiceRowWithAudio({ name, svc, loadConfig, settings, audioTarget, set
     const res = await fetch(API + '/api/config/services/' + encodeURIComponent(name), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ webhook, code: code || null, command: command || null, allow_list: allowList.length > 0 ? allowList : null }),
+      body: JSON.stringify({ webhook, method: webhookMethod, auth: buildAuthPayload(), code: code || null, command: command || null, stt: svc.stt || null, tts: svc.tts || null, format: svc.format || null, allow_list: allowList.length > 0 ? allowList : null }),
     });
     if (!res.ok) { const d = await res.json().catch(() => ({})); alert(d.error || 'Save failed'); return; }
     setEditing(false);
@@ -372,7 +383,36 @@ function ServiceRowWithAudio({ name, svc, loadConfig, settings, audioTarget, set
         <tr className="hover:bg-bg-light transition-colors">
           <td className="px-6 py-4 font-medium text-sm text-text">{name}</td>
           <td className="px-6 py-4 text-sm text-dim">{svc.channel}</td>
-          <td className="px-6 py-4"><input value={webhook} onChange={e => setWebhook(e.target.value)} placeholder="Webhook URL" className={inputCls} autoFocus /></td>
+          <td className="px-6 py-4 space-y-1">
+            <div className="flex gap-2">
+              <select value={webhookMethod} onChange={e => setWebhookMethod(e.target.value)} className={selectCls + ' w-[90px] shrink-0'}>
+                <option value="POST">POST</option>
+                <option value="GET">GET</option>
+                <option value="PUT">PUT</option>
+                <option value="PATCH">PATCH</option>
+              </select>
+              <input value={webhook} onChange={e => setWebhook(e.target.value)} placeholder="Webhook URL" className={inputCls} autoFocus />
+            </div>
+            <div className="space-y-1 pt-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-dim whitespace-nowrap">Auth:</span>
+                <select value={authType} onChange={e => { setAuthType(e.target.value); }} className={selectCls + ' flex-1 text-xs'}>
+                  <option value="">None</option>
+                  <option value="bearer">Bearer Token</option>
+                  <option value="header">Custom Header</option>
+                </select>
+              </div>
+              {authType === 'bearer' && (
+                <input value={authToken} onChange={e => setAuthToken(e.target.value)} placeholder="Bearer token" className={inputCls + ' text-xs'} />
+              )}
+              {authType === 'header' && (
+                <div className="flex gap-2">
+                  <input value={authHeaderName} onChange={e => setAuthHeaderName(e.target.value)} placeholder="Header name (e.g. X-API-Key)" className={inputCls + ' flex-1 text-xs'} />
+                  <input value={authHeaderValue} onChange={e => setAuthHeaderValue(e.target.value)} placeholder="Header value" className={inputCls + ' flex-1 text-xs'} />
+                </div>
+              )}
+            </div>
+          </td>
           <td className="px-6 py-4 space-y-1">
             <input value={code} onChange={e => setCode(e.target.value)} placeholder="Magic code" className={inputCls} />
             <input value={command} onChange={e => setCommand(e.target.value)} placeholder="Slash command" className={inputCls} />
@@ -406,7 +446,13 @@ function ServiceRowWithAudio({ name, svc, loadConfig, settings, audioTarget, set
             {infoParts.length > 0 && <div className="mt-0.5 text-[11px] text-dim">{infoParts.join(' \u00b7 ')}</div>}
           </td>
           <td className="px-6 py-4 text-sm text-dim">{svc.channel}</td>
-          <td className="px-6 py-4 max-w-[280px]"><span className="block truncate text-xs text-dim font-mono">{svc.webhook}</span></td>
+          <td className="px-6 py-4 max-w-[280px]">
+            <div className="flex items-center gap-1.5">
+              {svc.method && svc.method !== 'POST' && <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-bold rounded bg-primary/10 text-primary">{svc.method}</span>}
+              {svc.auth && <span className="shrink-0 material-symbols-outlined text-[14px] text-dim" title={svc.auth.type === 'bearer' ? 'Bearer token' : svc.auth.header_name}>lock</span>}
+              <span className="block truncate text-xs text-dim font-mono">{svc.webhook}</span>
+            </div>
+          </td>
           <td className="px-6 py-4 text-xs text-dim">{svc.code || svc.command || '\u2014'}</td>
           <td className="px-6 py-4 text-right whitespace-nowrap space-x-1">
             {isEndpoint && <button onClick={() => setShowExample(true)} className="px-3 py-1 text-xs font-medium text-primary border border-primary/30 rounded hover:bg-primary/5 transition-colors">Example</button>}
@@ -439,6 +485,11 @@ export default function Services({ loadConfig }) {
   const [selectedChannel, setSelectedChannel] = useState('');
   const [svcName, setSvcName] = useState('');
   const [svcWebhook, setSvcWebhook] = useState('');
+  const [svcMethod, setSvcMethod] = useState('POST');
+  const [svcAuthType, setSvcAuthType] = useState('');
+  const [svcAuthToken, setSvcAuthToken] = useState('');
+  const [svcAuthHeaderName, setSvcAuthHeaderName] = useState('');
+  const [svcAuthHeaderValue, setSvcAuthHeaderValue] = useState('');
   const [svcCode, setSvcCode] = useState('');
   const [svcCommand, setSvcCommand] = useState('');
   const [svcAllowListEnabled, setSvcAllowListEnabled] = useState(false);
@@ -462,10 +513,21 @@ export default function Services({ loadConfig }) {
     setSelectedChannel('');
     setSvcName('');
     setSvcWebhook('');
+    setSvcMethod('POST');
+    setSvcAuthType('');
+    setSvcAuthToken('');
+    setSvcAuthHeaderName('');
+    setSvcAuthHeaderValue('');
     setSvcCode('');
     setSvcCommand('');
     setSvcAllowListEnabled(false);
     setSvcAllowListText('');
+  }
+
+  function buildSvcAuthPayload() {
+    if (svcAuthType === 'bearer' && svcAuthToken) return { type: 'bearer', token: svcAuthToken };
+    if (svcAuthType === 'header' && svcAuthHeaderName && svcAuthHeaderValue) return { type: 'header', header_name: svcAuthHeaderName, header_value: svcAuthHeaderValue };
+    return null;
   }
 
   async function addService() {
@@ -473,11 +535,14 @@ export default function Services({ loadConfig }) {
     const allowList = svcAllowListEnabled && svcAllowListText.trim()
       ? svcAllowListText.split(',').map(n => n.trim()).filter(Boolean)
       : undefined;
+    const authPayload = buildSvcAuthPayload();
     const res = await fetch(API + '/api/config/services', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: svcName, channel: selectedChannel, webhook: svcWebhook,
+        method: svcMethod,
+        ...(authPayload && { auth: authPayload }),
         ...(svcCode && { code: svcCode }),
         ...(svcCommand && { command: svcCommand }),
         ...(allowList && { allow_list: allowList }),
@@ -551,7 +616,7 @@ export default function Services({ loadConfig }) {
                     >
                       <div className="w-8 h-8 flex items-center justify-center text-[28px]">{icon}</div>
                       <div className="text-sm font-medium text-text">{name}</div>
-                      <div className="text-[11px] text-dim leading-tight">{ch.type}{detail ? ' \u00b7 ' + detail : ''}</div>
+                      <div className="text-[11px] text-dim leading-tight w-full truncate">{ch.type}{detail ? ' \u00b7 ' + detail : ''}</div>
                     </div>
                   );
                 })}
@@ -567,7 +632,34 @@ export default function Services({ loadConfig }) {
             <p className="text-xs text-dim mb-3">Add a service for channel "{selectedChannel}"{channels[selectedChannel]?.type ? ` (${channels[selectedChannel].type.charAt(0).toUpperCase() + channels[selectedChannel].type.slice(1)})` : ''}.</p>
             <div className="flex gap-3 flex-wrap mb-3">
               <input value={svcName} onChange={e => setSvcName(e.target.value)} placeholder="Service name (e.g. support)" className={inputCls + ' flex-1 min-w-[140px]'} autoFocus />
-              <input value={svcWebhook} onChange={e => setSvcWebhook(e.target.value)} placeholder="Webhook URL (e.g. http://localhost:3000/support)" className={inputCls + ' flex-1 min-w-[140px]'} />
+              <div className="flex gap-2 flex-1 min-w-[140px]">
+                <select value={svcMethod} onChange={e => setSvcMethod(e.target.value)} className={selectCls + ' w-[90px] shrink-0'}>
+                  <option value="POST">POST</option>
+                  <option value="GET">GET</option>
+                  <option value="PUT">PUT</option>
+                  <option value="PATCH">PATCH</option>
+                </select>
+                <input value={svcWebhook} onChange={e => setSvcWebhook(e.target.value)} placeholder="Webhook URL (e.g. http://localhost:3000/support)" className={inputCls + ' flex-1'} />
+              </div>
+            </div>
+            <div className="flex gap-3 flex-wrap items-start mb-3">
+              <div className="flex items-center gap-2 min-w-[140px]">
+                <span className="text-xs text-dim whitespace-nowrap">Auth:</span>
+                <select value={svcAuthType} onChange={e => setSvcAuthType(e.target.value)} className={selectCls + ' text-xs'}>
+                  <option value="">None</option>
+                  <option value="bearer">Bearer Token</option>
+                  <option value="header">Custom Header</option>
+                </select>
+              </div>
+              {svcAuthType === 'bearer' && (
+                <input value={svcAuthToken} onChange={e => setSvcAuthToken(e.target.value)} placeholder="Bearer token" className={inputCls + ' flex-1 min-w-[140px] text-xs'} />
+              )}
+              {svcAuthType === 'header' && (
+                <>
+                  <input value={svcAuthHeaderName} onChange={e => setSvcAuthHeaderName(e.target.value)} placeholder="Header name (e.g. X-API-Key)" className={inputCls + ' flex-1 min-w-[140px] text-xs'} />
+                  <input value={svcAuthHeaderValue} onChange={e => setSvcAuthHeaderValue(e.target.value)} placeholder="Header value" className={inputCls + ' flex-1 min-w-[140px] text-xs'} />
+                </>
+              )}
             </div>
             {!isServiceMode && (
               <div className="flex gap-3 flex-wrap mb-3">

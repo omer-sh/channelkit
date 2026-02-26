@@ -207,18 +207,34 @@ export class WhatsAppChannel extends Channel {
         const unified = this.toUnified(msg, (msg as any).pushName);
         if (!unified) continue;
 
-        // Download media for audio/voice messages
-        if (unified.type === 'audio' && msg.message?.audioMessage) {
+        // Download media for messages with media content
+        const mediaTypes = ['audio', 'image', 'video', 'document', 'sticker'] as const;
+        if ((mediaTypes as readonly string[]).includes(unified.type) && msg.message) {
           try {
-            const am = msg.message.audioMessage;
-            console.log(`[whatsapp:${this.name}] audioMessage: fileLength=${am.fileLength}, seconds=${am.seconds}, url=${am.url ? 'yes' : 'no'}, directPath=${am.directPath ? 'yes' : 'no'}, mediaKey=${am.mediaKey ? 'yes' : 'no'}`);
-            const buffer = await downloadMediaMessage(msg, 'buffer', {});
-            const mimetype = msg.message.audioMessage.mimetype || 'audio/ogg; codecs=opus';
-            const seconds = msg.message.audioMessage.seconds || 0;
-            console.log(`[whatsapp:${this.name}] Downloaded audio: ${(buffer as Buffer).length} bytes, ${seconds}s, ${mimetype}`);
-            unified.media = { buffer: buffer as Buffer, mimetype };
+            const content = msg.message;
+            let mimetype: string | undefined;
+            let filename: string | undefined;
+
+            if (content.audioMessage) {
+              mimetype = content.audioMessage.mimetype || 'audio/ogg; codecs=opus';
+            } else if (content.imageMessage) {
+              mimetype = content.imageMessage.mimetype || 'image/jpeg';
+            } else if (content.videoMessage) {
+              mimetype = content.videoMessage.mimetype || 'video/mp4';
+            } else if (content.documentMessage) {
+              mimetype = content.documentMessage.mimetype || 'application/octet-stream';
+              filename = content.documentMessage.fileName || undefined;
+            } else if (content.stickerMessage) {
+              mimetype = content.stickerMessage.mimetype || 'image/webp';
+            }
+
+            if (mimetype) {
+              const buffer = await downloadMediaMessage(msg, 'buffer', {});
+              console.log(`[whatsapp:${this.name}] Downloaded ${unified.type}: ${(buffer as Buffer).length} bytes, ${mimetype}`);
+              unified.media = { buffer: buffer as Buffer, mimetype, filename };
+            }
           } catch (err) {
-            console.error(`[whatsapp:${this.name}] Failed to download audio:`, err);
+            console.error(`[whatsapp:${this.name}] Failed to download ${unified.type} media:`, err);
           }
         }
 

@@ -99,9 +99,18 @@ export interface FormatServiceConfig {
   prompt: string;             // instructions for how to format/transform the text
 }
 
+export interface ServiceAuthConfig {
+  type: 'bearer' | 'header';
+  token?: string;            // for bearer: the token value
+  header_name?: string;      // for header: custom header name (e.g. X-API-Key)
+  header_value?: string;     // for header: custom header value
+}
+
 export interface ServiceConfig {
   channel: string;          // references a key in channels
   webhook: string;          // endpoint URL
+  method?: 'POST' | 'GET' | 'PUT' | 'PATCH';  // HTTP method for webhook (default: POST)
+  auth?: ServiceAuthConfig; // authorization for webhook requests
   code?: string;            // magic code for onboarding (groups mode, WhatsApp)
   command?: string;         // slash command for Telegram multi-service (e.g. 'support')
   stt?: STTServiceConfig;   // speech-to-text config

@@ -1,16 +1,68 @@
 import { UnifiedMessage, WebhookResponse } from './types';
+import { ServiceAuthConfig } from '../config/types';
 
 function backoffDelay(attempt: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+}
+
+function buildAuthHeaders(auth?: ServiceAuthConfig): Record<string, string> {
+  if (!auth) return {};
+  if (auth.type === 'bearer' && auth.token) {
+    return { Authorization: `Bearer ${auth.token}` };
+  }
+  if (auth.type === 'header' && auth.header_name && auth.header_value) {
+    return { [auth.header_name]: auth.header_value };
+  }
+  return {};
+}
+
+/** Generate a filename when the channel doesn't provide one */
+function guessFilename(type: string, mimetype: string): string {
+  const ext = mimetype.split('/').pop()?.split(';')[0] || 'bin';
+  return `${type || 'file'}.${ext}`;
 }
 
 export async function dispatchWebhook(
   url: string,
   message: UnifiedMessage,
   replyUrl?: string,
-  { maxRetries = 3, timeout = 5000 }: { maxRetries?: number; timeout?: number } = {}
+  { maxRetries = 3, timeout = 5000, method = 'POST', auth }: { maxRetries?: number; timeout?: number; method?: string; auth?: ServiceAuthConfig } = {}
 ): Promise<WebhookResponse | null> {
   const payload = replyUrl ? { ...message, replyUrl } : message;
+  const httpMethod = (method || 'POST').toUpperCase();
+  const authHeaders = buildAuthHeaders(auth);
+
+  // Send as multipart/form-data when method is POST and message carries a media buffer
+  const useMultipart = httpMethod === 'POST' && !!message.media?.buffer;
+
+  let body: FormData | string | undefined;
+  let headers: Record<string, string>;
+
+  if (useMultipart) {
+    const formData = new FormData();
+
+    // Build metadata: full payload without the buffer (not JSON-serializable)
+    const { media, ...rest } = payload as any;
+    const metadata = {
+      ...rest,
+      media: media ? { mimetype: media.mimetype, filename: media.filename } : undefined,
+    };
+    formData.append('metadata', JSON.stringify(metadata));
+
+    // Append the file
+    const mimetype = message.media!.mimetype || 'application/octet-stream';
+    const filename = message.media!.filename || guessFilename(message.type, mimetype);
+    const blob = new Blob([new Uint8Array(message.media!.buffer!)], { type: mimetype });
+    formData.append('file', blob, filename);
+
+    body = formData;
+    // Don't set Content-Type — fetch sets it with the boundary automatically
+    headers = { ...authHeaders };
+  } else {
+    const canHaveBody = httpMethod !== 'GET' && httpMethod !== 'HEAD';
+    body = canHaveBody ? JSON.stringify(payload) : undefined;
+    headers = { 'Content-Type': 'application/json', ...authHeaders };
+  }
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const controller = new AbortController();
@@ -18,9 +70,9 @@ export async function dispatchWebhook(
 
     try {
       const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        method: httpMethod,
+        headers,
+        ...(body && { body }),
         signal: controller.signal,
       });
 

@@ -15,10 +15,12 @@ export interface LogEntry {
   groupName?: string;
   route?: string;
   responseText?: string;
-  status: 'success' | 'error' | 'no-route' | 'blocked';
+  status: 'success' | 'error' | 'no-route' | 'blocked' | 'format-error';
   latency?: number;
   sttTranscription?: string;
   ttsGenerated?: boolean;
+  formatApplied?: boolean;
+  formatOriginalText?: string;
 }
 
 const RETENTION_DAYS = 30;
@@ -65,6 +67,8 @@ export class Logger extends EventEmitter {
     // Migration: add columns if they don't exist (for existing databases)
     try { this.db.exec('ALTER TABLE logs ADD COLUMN stt_transcription TEXT'); } catch {}
     try { this.db.exec('ALTER TABLE logs ADD COLUMN tts_generated INTEGER'); } catch {}
+    try { this.db.exec('ALTER TABLE logs ADD COLUMN format_applied INTEGER'); } catch {}
+    try { this.db.exec('ALTER TABLE logs ADD COLUMN format_original_text TEXT'); } catch {}
   }
 
   private cleanup(): void {
@@ -77,8 +81,8 @@ export class Logger extends EventEmitter {
 
   log(entry: LogEntry): void {
     this.db.prepare(`
-      INSERT OR REPLACE INTO logs (id, timestamp, channel, from_jid, sender_name, text, type, group_id, group_name, webhook_url, response_text, status, latency_ms, stt_transcription, tts_generated)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO logs (id, timestamp, channel, from_jid, sender_name, text, type, group_id, group_name, webhook_url, response_text, status, latency_ms, stt_transcription, tts_generated, format_applied, format_original_text)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       entry.id,
       entry.timestamp,
@@ -94,7 +98,9 @@ export class Logger extends EventEmitter {
       entry.status,
       entry.latency ?? null,
       entry.sttTranscription || null,
-      entry.ttsGenerated ? 1 : null
+      entry.ttsGenerated ? 1 : null,
+      entry.formatApplied ? 1 : null,
+      entry.formatOriginalText || null
     );
     this.emit('entry', entry);
   }
@@ -179,6 +185,8 @@ export class Logger extends EventEmitter {
       latency: row.latency_ms ?? undefined,
       sttTranscription: row.stt_transcription || undefined,
       ttsGenerated: row.tts_generated ? true : undefined,
+      formatApplied: row.format_applied ? true : undefined,
+      formatOriginalText: row.format_original_text || undefined,
     };
   }
 }

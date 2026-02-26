@@ -76,20 +76,53 @@ export class TelegramChannel extends Channel {
       const unified = this.toUnified(ctx);
       if (!unified) return;
 
-      // Download audio/voice for STT
-      if (unified.type === 'audio' && (ctx.message?.voice || ctx.message?.audio)) {
+      // Download media for messages with media content
+      const mediaDownloadTypes = ['audio', 'image', 'video', 'document', 'sticker'] as const;
+      if ((mediaDownloadTypes as readonly string[]).includes(unified.type)) {
         try {
-          const fileId = ctx.message.voice?.file_id || ctx.message.audio?.file_id;
+          let fileId: string | undefined;
+          let mimetype: string | undefined;
+          let filename: string | undefined;
+          const msg = ctx.message!;
+
+          if (msg.voice) {
+            fileId = msg.voice.file_id;
+            mimetype = msg.voice.mime_type || 'audio/ogg';
+          } else if (msg.audio) {
+            fileId = msg.audio.file_id;
+            mimetype = msg.audio.mime_type || 'audio/mpeg';
+            filename = msg.audio.file_name || undefined;
+          } else if (msg.photo && msg.photo.length > 0) {
+            const largest = msg.photo[msg.photo.length - 1];
+            fileId = largest.file_id;
+            mimetype = 'image/jpeg';
+          } else if (msg.document) {
+            fileId = msg.document.file_id;
+            mimetype = msg.document.mime_type || 'application/octet-stream';
+            filename = msg.document.file_name || undefined;
+          } else if (msg.video) {
+            fileId = msg.video.file_id;
+            mimetype = msg.video.mime_type || 'video/mp4';
+            filename = msg.video.file_name || undefined;
+          } else if (msg.video_note) {
+            fileId = msg.video_note.file_id;
+            mimetype = 'video/mp4';
+          } else if (msg.sticker) {
+            fileId = msg.sticker.file_id;
+            mimetype = msg.sticker.is_animated ? 'application/x-tgsticker' :
+                       msg.sticker.is_video ? 'video/webm' : 'image/webp';
+          }
+
           if (fileId) {
             const file = await ctx.api.getFile(fileId);
             const url = `https://api.telegram.org/file/bot${this.token}/${file.file_path}`;
             const res = await fetch(url);
             const buffer = Buffer.from(await res.arrayBuffer());
-            const mimetype = ctx.message.voice?.mime_type || ctx.message.audio?.mime_type || 'audio/ogg';
-            unified.media = { buffer, mimetype };
+            console.log(`[telegram:${this.name}] Downloaded ${unified.type}: ${buffer.length} bytes, ${mimetype}`);
+            unified.media = { buffer, mimetype, filename };
           }
         } catch (err) {
-          console.error(`[telegram:${this.name}] Failed to download audio:`, err);
+          console.error(`[telegram:${this.name}] Failed to download ${unified.type} media:`, err);
         }
       }
 

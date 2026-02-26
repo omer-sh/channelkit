@@ -120,7 +120,7 @@ class GoogleFormatter implements FormatProvider {
 
   constructor(config: FormatServiceConfig) {
     this.apiKey = getApiKey('google');
-    this.model = config.model || 'gemini-2.0-flash';
+    this.model = config.model || 'gemini-2.5-flash';
   }
 
   async format(text: string, prompt: string): Promise<string> {

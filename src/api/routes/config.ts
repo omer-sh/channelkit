@@ -21,9 +21,18 @@ export function registerConfigRoutes(app: Express, ctx: ServerContext): void {
   // POST /api/config/services — add a new service
   app.post('/api/config/services', (req, res) => {
     if (!ctx.configPath) { res.status(503).json({ error: 'Config path not set' }); return; }
-    const { name, channel, webhook, code, command, allow_list } = req.body;
+    const { name, channel, webhook, code, command, allow_list, method, auth } = req.body;
     if (!name || !channel || !webhook) {
       res.status(400).json({ error: 'name, channel, and webhook are required' });
+      return;
+    }
+    const validMethods = ['POST', 'GET', 'PUT', 'PATCH'];
+    if (method && !validMethods.includes(method.toUpperCase())) {
+      res.status(400).json({ error: `Invalid method. Must be one of: ${validMethods.join(', ')}` });
+      return;
+    }
+    if (auth && !['bearer', 'header'].includes(auth.type)) {
+      res.status(400).json({ error: 'Invalid auth type. Must be "bearer" or "header"' });
       return;
     }
     try {
@@ -37,13 +46,17 @@ export function registerConfigRoutes(app: Express, ctx: ServerContext): void {
         res.status(400).json({ error: `Channel "${channel}" does not exist` });
         return;
       }
+      const methodUpper = method ? method.toUpperCase() : undefined;
       config.services[name] = {
         channel, webhook,
+        ...(methodUpper && methodUpper !== 'POST' && { method: methodUpper }),
+        ...(auth?.type && { auth }),
         ...(code && { code }),
         ...(command && { command }),
         ...(Array.isArray(allow_list) && allow_list.length > 0 && { allow_list }),
       };
       saveConfig(ctx.configPath, config);
+      ctx.reloadRouter?.();
       ctx.broadcast({ type: 'configChanged' });
       res.json({ ok: true });
     } catch (err: any) {
@@ -55,8 +68,17 @@ export function registerConfigRoutes(app: Express, ctx: ServerContext): void {
   app.put('/api/config/services/:name', (req, res) => {
     if (!ctx.configPath) { res.status(503).json({ error: 'Config path not set' }); return; }
     const { name } = req.params;
-    const { webhook, code, command, stt, tts, format, allow_list } = req.body;
+    const { webhook, code, command, stt, tts, format, allow_list, method, auth } = req.body;
     if (!webhook) { res.status(400).json({ error: 'webhook is required' }); return; }
+    const validMethods = ['POST', 'GET', 'PUT', 'PATCH'];
+    if (method && !validMethods.includes(method.toUpperCase())) {
+      res.status(400).json({ error: `Invalid method. Must be one of: ${validMethods.join(', ')}` });
+      return;
+    }
+    if (auth && !['bearer', 'header'].includes(auth.type)) {
+      res.status(400).json({ error: 'Invalid auth type. Must be "bearer" or "header"' });
+      return;
+    }
     const validSttProviders = ['google', 'whisper', 'deepgram'];
     const validTtsProviders = ['google', 'elevenlabs', 'openai'];
     const validFormatProviders = ['openai', 'anthropic', 'google'];
@@ -79,27 +101,36 @@ export function registerConfigRoutes(app: Express, ctx: ServerContext): void {
         return;
       }
       config.services[name].webhook = webhook;
+      const methodUpper = method ? method.toUpperCase() : undefined;
+      if (methodUpper && methodUpper !== 'POST') { config.services[name].method = methodUpper as any; } else { delete config.services[name].method; }
+      if (auth?.type) { config.services[name].auth = auth; } else { delete config.services[name].auth; }
       if (code) { config.services[name].code = code; } else { delete config.services[name].code; }
       if (command) { config.services[name].command = command; } else { delete config.services[name].command; }
-      if (stt && stt.provider) {
-        config.services[name].stt = { provider: stt.provider };
-        if (stt.language) config.services[name].stt.language = stt.language;
-        if (stt.alternative_languages?.length) config.services[name].stt.alternative_languages = stt.alternative_languages;
-      } else {
-        delete config.services[name].stt;
+      if ('stt' in req.body) {
+        if (stt && stt.provider) {
+          config.services[name].stt = { provider: stt.provider };
+          if (stt.language) config.services[name].stt.language = stt.language;
+          if (stt.alternative_languages?.length) config.services[name].stt.alternative_languages = stt.alternative_languages;
+        } else {
+          delete config.services[name].stt;
+        }
       }
-      if (tts && tts.provider) {
-        config.services[name].tts = { provider: tts.provider };
-        if (tts.language) config.services[name].tts.language = tts.language;
-        if (tts.voice) config.services[name].tts.voice = tts.voice;
-      } else {
-        delete config.services[name].tts;
+      if ('tts' in req.body) {
+        if (tts && tts.provider) {
+          config.services[name].tts = { provider: tts.provider };
+          if (tts.language) config.services[name].tts.language = tts.language;
+          if (tts.voice) config.services[name].tts.voice = tts.voice;
+        } else {
+          delete config.services[name].tts;
+        }
       }
-      if (format && format.provider) {
-        config.services[name].format = { provider: format.provider, prompt: format.prompt || '' };
-        if (format.model) config.services[name].format!.model = format.model;
-      } else {
-        delete config.services[name].format;
+      if ('format' in req.body) {
+        if (format && format.provider) {
+          config.services[name].format = { provider: format.provider, prompt: format.prompt || '' };
+          if (format.model) config.services[name].format!.model = format.model;
+        } else {
+          delete config.services[name].format;
+        }
       }
       if (Array.isArray(allow_list) && allow_list.length > 0) {
         config.services[name].allow_list = allow_list;
@@ -107,6 +138,7 @@ export function registerConfigRoutes(app: Express, ctx: ServerContext): void {
         delete config.services[name].allow_list;
       }
       saveConfig(ctx.configPath, config);
+      ctx.reloadRouter?.();
       ctx.broadcast({ type: 'configChanged' });
       res.json({ ok: true });
     } catch (err: any) {
@@ -126,6 +158,7 @@ export function registerConfigRoutes(app: Express, ctx: ServerContext): void {
       }
       delete config.services![name];
       saveConfig(ctx.configPath, config);
+      ctx.reloadRouter?.();
       ctx.broadcast({ type: 'configChanged' });
       res.json({ ok: true });
     } catch (err: any) {
@@ -258,7 +291,7 @@ export function registerConfigRoutes(app: Express, ctx: ServerContext): void {
   app.put('/api/config/channels/:name/email-settings', async (req, res) => {
     if (!ctx.configPath) { res.status(503).json({ error: 'Config path not set' }); return; }
     const { name } = req.params;
-    const { inbound_mode, poll_interval } = req.body;
+    const { inbound_mode, poll_interval, from_email } = req.body;
 
     if (!inbound_mode || !['polling', 'webhook'].includes(inbound_mode)) {
       res.status(400).json({ error: 'inbound_mode must be "polling" or "webhook"' });
@@ -327,6 +360,10 @@ export function registerConfigRoutes(app: Express, ctx: ServerContext): void {
           delete (ch as any).webhook_secret;
         }
         ch.poll_interval = parseInt(poll_interval) || 30;
+      }
+
+      if (from_email && typeof from_email === 'string') {
+        (ch as any).from_email = from_email.trim();
       }
 
       saveConfig(ctx.configPath, config);

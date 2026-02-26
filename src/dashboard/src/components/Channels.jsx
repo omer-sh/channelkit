@@ -137,6 +137,65 @@ function SmsSettingsRow({ name, currentMode, currentInterval, onClose, loadConfi
   );
 }
 
+function EmailSettingsRow({ name, ch, onClose, loadConfig }) {
+  const { tunnelActive } = useAppState();
+  const [fromEmail, setFromEmail] = useState(ch.from_email || '');
+  const currentMode = ch.poll_interval ? 'polling' : 'webhook';
+  const [mode, setMode] = useState(currentMode);
+  const [interval, setInterv] = useState(ch.poll_interval || 30);
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    if (!fromEmail.trim()) { alert('From email is required'); return; }
+    if (mode === 'webhook' && !tunnelActive) { alert('Please externalize the service first.'); return; }
+    setSaving(true);
+    try {
+      const res = await fetch(API + '/api/config/channels/' + encodeURIComponent(name) + '/email-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inbound_mode: mode, from_email: fromEmail.trim(), ...(mode === 'polling' && { poll_interval: parseInt(interval) || 30 }) }),
+      });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(d.error || 'Failed'); setSaving(false); return; }
+      onClose();
+      loadConfig();
+    } catch (e) { alert(e.message); setSaving(false); }
+  }
+
+  return (
+    <tr>
+      <td colSpan={6} className="px-6 py-4">
+        <div className="bg-bg-light border border-border rounded-lg p-4 space-y-3">
+          <div className="text-sm font-semibold text-text">Email Settings &mdash; {name}</div>
+          <div className="space-y-1">
+            <div className="text-xs font-semibold text-dim">From Email</div>
+            <input value={fromEmail} onChange={e => setFromEmail(e.target.value)} placeholder="support@yourdomain.com" className={inputCls} />
+            <div className="text-[11px] text-dim">Must be a verified domain in your Resend account.</div>
+          </div>
+          <div className="space-y-1">
+            <div className="text-xs font-semibold text-dim">Inbound Mode</div>
+            <select value={mode} onChange={e => setMode(e.target.value)} className={selectCls}>
+              <option value="webhook">Webhook &mdash; Resend forwards emails to your endpoint</option>
+              <option value="polling">Polling &mdash; fetch emails at regular intervals</option>
+            </select>
+          </div>
+          {mode === 'polling' && (
+            <input type="number" value={interval} onChange={e => setInterv(e.target.value)} min="5" max="3600" placeholder="Poll interval in seconds" className={inputCls} />
+          )}
+          {mode === 'webhook' && !tunnelActive && (
+            <div className="p-3 rounded-lg text-xs bg-yellow-light text-yellow border border-yellow/20">
+              Service is not externalized. Please <strong>Externalize</strong> first.
+            </div>
+          )}
+          <div className="flex items-center gap-2 pt-1">
+            <button onClick={save} disabled={saving} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-50">{saving ? 'Saving\u2026' : 'Save'}</button>
+            <button onClick={onClose} className="px-4 py-2 border border-border rounded-lg text-sm text-dim hover:bg-bg-light transition-colors">Cancel</button>
+          </div>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 function BuyNumberPanel({ typeKey, fieldValues, onNumberPurchased, onClose }) {
   const { twilioDefaults } = useAppState();
   const isWA = typeKey === 'whatsapp';
@@ -356,6 +415,7 @@ export default function Channels({ loadConfig }) {
   const [showBuy, setShowBuy] = useState(false);
   const [qrChannel, setQrChannel] = useState(null);
   const [smsSettingsTarget, setSmsSettingsTarget] = useState(null);
+  const [emailSettingsTarget, setEmailSettingsTarget] = useState(null);
   const [endpointResponseMode, setEndpointResponseMode] = useState('sync');
   const [endpointTimeout, setEndpointTimeout] = useState('30');
   const [allowListEnabled, setAllowListEnabled] = useState(false);
@@ -514,6 +574,7 @@ export default function Channels({ loadConfig }) {
                 const deps = Object.entries(services).filter(([, s]) => s.channel === name).map(([n]) => n);
                 const detail = ch.number || (ch.bot_token ? ch.bot_token.slice(0, 12) + '\u2026' : '') || ch.from_email || '';
                 const isSms = ch.type === 'sms';
+                const isResendEmail = ch.type === 'email' && ch.provider === 'resend';
                 const smsMode = isSms ? (ch.poll_interval ? 'polling' : 'webhook') : '';
                 const smsModeLabel = isSms ? (ch.poll_interval ? `Polling (${ch.poll_interval}s)` : 'External Address') : '';
 
@@ -553,11 +614,15 @@ export default function Channels({ loadConfig }) {
                           }} className="px-3 py-1 text-xs font-medium text-primary border border-primary/30 rounded hover:bg-primary/5 transition-colors">Allow List</button>
                         )}
                         {isSms && <button onClick={() => setSmsSettingsTarget(smsSettingsTarget === name ? null : name)} className="px-3 py-1 text-xs font-medium text-primary border border-primary/30 rounded hover:bg-primary/5 transition-colors">Settings</button>}
+                        {isResendEmail && <button onClick={() => setEmailSettingsTarget(emailSettingsTarget === name ? null : name)} className="px-3 py-1 text-xs font-medium text-primary border border-primary/30 rounded hover:bg-primary/5 transition-colors">Settings</button>}
                         <button onClick={() => removeChannel(name, deps)} className="px-3 py-1 text-xs font-medium text-red border border-red/30 rounded hover:bg-red-light transition-colors">Remove</button>
                       </td>
                     </tr>
                     {smsSettingsTarget === name && (
                       <SmsSettingsRow name={name} currentMode={smsMode} currentInterval={ch.poll_interval || 60} onClose={() => setSmsSettingsTarget(null)} loadConfig={loadConfig} />
+                    )}
+                    {emailSettingsTarget === name && isResendEmail && (
+                      <EmailSettingsRow name={name} ch={ch} onClose={() => setEmailSettingsTarget(null)} loadConfig={loadConfig} />
                     )}
                     {allowListTarget === name && (
                       <tr>

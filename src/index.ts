@@ -198,6 +198,21 @@ export class ChannelKit {
     if (this.configPath) {
       this.apiServer.setConfigPath(this.configPath);
     }
+
+    // Wire up hot-reload: when services are changed via dashboard, reload the Router
+    this.apiServer.reloadRouter = () => {
+      if (!this.configPath) return;
+      try {
+        const freshConfig = loadConfig(this.configPath, { validate: false });
+        if (freshConfig.services) {
+          this.router.reloadServices(freshConfig.services);
+          console.log('[router] Services reloaded from config');
+        }
+      } catch (err: any) {
+        console.error(`[router] Failed to reload services: ${err.message}`);
+      }
+    };
+
     if (this.config.api_secret) {
       this.apiServer.setApiSecret(this.config.api_secret);
     }

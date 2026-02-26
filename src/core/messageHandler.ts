@@ -150,11 +150,35 @@ export function wireMessageHandler(channel: Channel, deps: MessageHandlerDeps): 
     }
 
     let sttTranscription: string | undefined;
+    let formatApplied: boolean | undefined;
+    let formatOriginalText: string | undefined;
     if (serviceConfig) {
       const originalText = message.text;
-      await processInbound(message, serviceConfig);
+      const inboundResult = await processInbound(message, serviceConfig);
       if (message.type === 'audio' && message.text && message.text !== originalText) {
         sttTranscription = message.text;
+      }
+      formatApplied = inboundResult.formatApplied;
+      formatOriginalText = inboundResult.formatOriginalText;
+
+      // If formatting failed, cancel the request and log as format-error
+      if (inboundResult.formatError) {
+        logger.log({
+          id: message.id,
+          timestamp: Date.now(),
+          channel: message.channel,
+          from: message.from,
+          senderName: message.senderName,
+          text: message.text,
+          type: message.type,
+          groupId: message.groupId,
+          groupName: message.groupName,
+          responseText: `[Format error: ${inboundResult.formatError}]`,
+          status: 'format-error',
+          latency: 0,
+          sttTranscription,
+        });
+        return;
       }
     }
 
@@ -242,6 +266,8 @@ export function wireMessageHandler(channel: Channel, deps: MessageHandlerDeps): 
       latency,
       sttTranscription,
       ttsGenerated: ttsGenerated || undefined,
+      formatApplied,
+      formatOriginalText,
     });
   });
 }

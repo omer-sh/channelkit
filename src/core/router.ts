@@ -39,6 +39,33 @@ export class Router {
     }
   }
 
+  /**
+   * Hot-reload services from updated config (e.g. after dashboard edits).
+   * Preserves legacy routes already loaded.
+   */
+  reloadServices(services: Record<string, ServiceConfig>): void {
+    // Remove non-legacy services
+    for (const name of [...this.services.keys()]) {
+      if (!name.startsWith('_route_')) {
+        this.services.delete(name);
+      }
+    }
+    // Rebuild servicesByChannel (keep legacy routes)
+    this.servicesByChannel.clear();
+    for (const [name, svc] of this.services.entries()) {
+      const list = this.servicesByChannel.get(svc.channel) || [];
+      list.push(svc);
+      this.servicesByChannel.set(svc.channel, list);
+    }
+    // Add updated services
+    for (const [name, svc] of Object.entries(services)) {
+      this.services.set(name, svc);
+      const list = this.servicesByChannel.get(svc.channel) || [];
+      list.push(svc);
+      this.servicesByChannel.set(svc.channel, list);
+    }
+  }
+
   setGroupStore(store: GroupStore): void {
     this.groupStore = store;
   }
@@ -123,43 +150,19 @@ export class Router {
     return undefined;
   }
 
-  private findWebhook(message: UnifiedMessage): string | undefined {
-    const channelName = message.channelName || message.channel;
-
-    // Check for pre-resolved webhook (e.g. Telegram slash commands)
-    if ((message as any)._resolvedWebhook) {
-      return (message as any)._resolvedWebhook;
-    }
-
-    // Check group→service mapping first (groups mode)
-    if (message.groupId && this.groupStore) {
-      const mapping = this.groupStore.get(message.groupId);
-      if (mapping) return mapping.webhook;
-    }
-
-    // Direct mode: single service on this channel
-    const services = this.servicesByChannel.get(channelName) || [];
-    if (services.length === 1) return services[0].webhook;
-
-    // Fallback: try matching by channel type (legacy)
-    const byType = this.servicesByChannel.get(message.channel) || [];
-    if (byType.length === 1) return byType[0].webhook;
-
-    return undefined;
-  }
-
   async route(message: UnifiedMessage, replyUrl?: string): Promise<{ response: WebhookResponse | null; webhook?: string; latency: number }> {
-    const webhook = this.findWebhook(message);
+    const svc = this.findServiceConfig(message);
     const startTime = Date.now();
 
-    if (!webhook) {
+    if (!svc) {
       console.log(`[router] No service matched for message ${message.id} on ${message.channelName || message.channel}`);
       return { response: null, webhook: undefined, latency: 0 };
     }
 
-    console.log(`[router] Routing ${message.id} → ${webhook}`);
-    const response = await dispatchWebhook(webhook, message, replyUrl);
+    console.log(`[router] Routing ${message.id} → ${svc.webhook}`);
+    const timeoutMs = message.media?.buffer ? 30000 : 5000;
+    const response = await dispatchWebhook(svc.webhook, message, replyUrl, { method: svc.method, auth: svc.auth, timeout: timeoutMs });
     const latency = Date.now() - startTime;
-    return { response, webhook, latency };
+    return { response, webhook: svc.webhook, latency };
   }
 }
