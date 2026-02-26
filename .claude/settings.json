@@ -25,7 +25,17 @@
       "Bash(npx @modelcontextprotocol/inspector:*)",
       "Bash(timeout:*)",
       "Bash(git -C /Users/naamasha/development/channelkit remote -v)",
-      "Bash(git -C /Users/naamasha/development/channelkit log --oneline -15)"
+      "Bash(git -C /Users/naamasha/development/channelkit log --oneline -15)",
+      "Bash(git -C /Users/naamasha/development/channelkit log --oneline -10)",
+      "Bash(git -C /Users/naamasha/development/channelkit log --oneline)",
+      "Bash(git -C /Users/naamasha/development/channelkit diff d905806..HEAD -- src/mcp/)",
+      "Bash(git -C /Users/naamasha/development/channelkit log --all --oneline --decorate)",
+      "Bash(git -C /Users/naamasha/development/channelkit show 24f43f1:src/mcp/server.ts)",
+      "Bash(git -C /Users/naamasha/development/channelkit log --oneline --all -- \"src/mcp/*\")",
+      "Bash(git -C /Users/naamasha/development/channelkit diff 887f866..HEAD -- src/mcp/server.ts)",
+      "Bash(git -C /Users/naamasha/development/channelkit show d16c7c6:src/mcp/server.ts)",
+      "Bash(git -C /Users/naamasha/development/channelkit show --stat d16c7c6)",
+      "Bash(git -C /Users/naamasha/development/channelkit diff 24f43f1..d16c7c6 -- src/mcp/server.ts)"
     ]
   }
 }

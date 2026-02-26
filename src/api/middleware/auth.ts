@@ -42,6 +42,9 @@ export function mcpAuthCheck(ctx: ServerContext) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!isMcpPath(req.path)) { next(); return; }
     if (!ctx.mcpSecret) { next(); return; }
+    // Skip auth for local connections — secret is only enforced for external/tunnel access
+    const host = req.headers.host || '';
+    if (host.includes('localhost') || host.includes('127.0.0.1')) { next(); return; }
     const auth = req.headers.authorization;
     if (auth && auth === `Bearer ${ctx.mcpSecret}`) {
       next(); return;
