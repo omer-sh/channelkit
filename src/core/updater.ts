@@ -1,10 +1,13 @@
 import { execSync } from 'child_process';
+import { existsSync } from 'fs';
+import { join } from 'path';
 import { Channel } from '../channels/base';
 import { restartProcess } from './restart';
 
 export interface UpdateStatus {
-  currentCommit: string;
-  remoteCommit: string;
+  mode: 'git' | 'npm';
+  currentVersion: string;
+  latestVersion: string;
   updateAvailable: boolean;
   behindCount: number;
   lastChecked: number;
@@ -12,22 +15,33 @@ export interface UpdateStatus {
 
 export interface UpdateResult {
   success: boolean;
-  previousCommit: string;
-  newCommit: string;
+  previousVersion: string;
+  newVersion: string;
   error?: string;
 }
+
+const PKG_NAME = '@dirbalak/channelkit';
 
 export class Updater {
   private lastStatus: UpdateStatus | null = null;
   private autoUpdateTimer: ReturnType<typeof setInterval> | null = null;
   private projectRoot: string;
   private updating = false;
+  private mode: 'git' | 'npm';
 
   constructor(
     private channels: Map<string, Channel>,
     private onLog?: (message: string) => void,
   ) {
     this.projectRoot = process.cwd();
+    this.mode = this.detectMode();
+    this.log(`Running in ${this.mode} mode`);
+  }
+
+  private detectMode(): 'git' | 'npm' {
+    // If there's a .git directory in the project root, it's a git clone
+    if (existsSync(join(this.projectRoot, '.git'))) return 'git';
+    return 'npm';
   }
 
   private log(msg: string): void {
@@ -40,9 +54,18 @@ export class Updater {
     return execSync(cmd, { cwd: this.projectRoot, encoding: 'utf-8', timeout }).trim();
   }
 
-  getCurrentCommit(): string {
+  getCurrentVersion(): string {
+    if (this.mode === 'git') {
+      try {
+        return this.exec('git rev-parse --short HEAD');
+      } catch {
+        return 'unknown';
+      }
+    }
+    // npm mode — read version from our own package.json
     try {
-      return this.exec('git rev-parse --short HEAD');
+      const pkgPath = join(__dirname, '..', '..', 'package.json');
+      return require(pkgPath).version || 'unknown';
     } catch {
       return 'unknown';
     }
@@ -53,15 +76,23 @@ export class Updater {
   }
 
   async checkForUpdate(): Promise<UpdateStatus> {
-    const currentCommit = this.getCurrentCommit();
+    if (this.mode === 'git') {
+      return this.checkGitUpdate();
+    }
+    return this.checkNpmUpdate();
+  }
+
+  private async checkGitUpdate(): Promise<UpdateStatus> {
+    const currentVersion = this.getCurrentVersion();
 
     try {
       this.exec('git fetch origin main', 30000);
     } catch (err: any) {
       this.log(`Failed to fetch from origin: ${err.message}`);
       this.lastStatus = {
-        currentCommit,
-        remoteCommit: currentCommit,
+        mode: 'git',
+        currentVersion,
+        latestVersion: currentVersion,
         updateAvailable: false,
         behindCount: 0,
         lastChecked: Date.now(),
@@ -69,7 +100,7 @@ export class Updater {
       return this.lastStatus;
     }
 
-    const remoteCommit = this.exec('git rev-parse --short origin/main');
+    const latestVersion = this.exec('git rev-parse --short origin/main');
     const currentFull = this.exec('git rev-parse HEAD');
     const remoteFull = this.exec('git rev-parse origin/main');
 
@@ -81,15 +112,53 @@ export class Updater {
     const updateAvailable = currentFull !== remoteFull;
 
     this.lastStatus = {
-      currentCommit,
-      remoteCommit,
+      mode: 'git',
+      currentVersion,
+      latestVersion,
       updateAvailable,
       behindCount,
       lastChecked: Date.now(),
     };
 
     if (updateAvailable) {
-      this.log(`Update available: ${currentCommit} -> ${remoteCommit} (${behindCount} commit(s) behind)`);
+      this.log(`Update available: ${currentVersion} -> ${latestVersion} (${behindCount} commit(s) behind)`);
+    }
+
+    return this.lastStatus;
+  }
+
+  private async checkNpmUpdate(): Promise<UpdateStatus> {
+    const currentVersion = this.getCurrentVersion();
+
+    let latestVersion = currentVersion;
+    try {
+      latestVersion = this.exec(`npm view ${PKG_NAME} version`, 15000);
+    } catch (err: any) {
+      this.log(`Failed to check npm registry: ${err.message}`);
+      this.lastStatus = {
+        mode: 'npm',
+        currentVersion,
+        latestVersion: currentVersion,
+        updateAvailable: false,
+        behindCount: 0,
+        lastChecked: Date.now(),
+      };
+      return this.lastStatus;
+    }
+
+    const updateAvailable = currentVersion !== latestVersion;
+
+    this.lastStatus = {
+      mode: 'npm',
+      currentVersion,
+      latestVersion,
+      updateAvailable,
+      behindCount: updateAvailable ? 1 : 0,
+      lastChecked: Date.now(),
+    };
+
+    if (updateAvailable) {
+      this.log(`Update available: ${currentVersion} -> ${latestVersion}`);
     }
 
     return this.lastStatus;
@@ -97,18 +166,25 @@ export class Updater {
 
   async performUpdate(): Promise<UpdateResult> {
     if (this.updating) {
-      return { success: false, previousCommit: '', newCommit: '', error: 'Update already in progress' };
+      return { success: false, previousVersion: '', newVersion: '', error: 'Update already in progress' };
     }
 
     this.updating = true;
-    const previousCommit = this.getCurrentCommit();
+
+    if (this.mode === 'git') {
+      return this.performGitUpdate();
+    }
+    return this.performNpmUpdate();
+  }
+
+  private async performGitUpdate(): Promise<UpdateResult> {
+    const previousVersion = this.getCurrentVersion();
 
     try {
-      // Check for dirty working tree
       const dirty = this.exec('git status --porcelain');
       if (dirty) {
         this.updating = false;
-        return { success: false, previousCommit, newCommit: previousCommit, error: 'Working tree has uncommitted changes. Commit or stash them first.' };
+        return { success: false, previousVersion, newVersion: previousVersion, error: 'Working tree has uncommitted changes. Commit or stash them first.' };
       }
 
       this.log('Pulling latest changes from origin/main...');
@@ -120,17 +196,54 @@ export class Updater {
       this.log('Building...');
       this.exec('npm run build', 120000);
 
-      const newCommit = this.getCurrentCommit();
-      this.log(`Update complete: ${previousCommit} -> ${newCommit}. Restarting...`);
+      const newVersion = this.getCurrentVersion();
+      this.log(`Update complete: ${previousVersion} -> ${newVersion}. Restarting...`);
 
-      // Schedule restart
       setTimeout(() => restartProcess(this.channels), 500);
 
-      return { success: true, previousCommit, newCommit };
+      return { success: true, previousVersion, newVersion };
     } catch (err: any) {
       this.updating = false;
       this.log(`Update failed: ${err.message}`);
-      return { success: false, previousCommit, newCommit: previousCommit, error: err.message };
+      return { success: false, previousVersion, newVersion: previousVersion, error: err.message };
+    }
+  }
+
+  private async performNpmUpdate(): Promise<UpdateResult> {
+    const previousVersion = this.getCurrentVersion();
+
+    try {
+      this.log(`Updating ${PKG_NAME} via npm...`);
+
+      // Detect if installed globally or locally
+      const isGlobal = this.isGlobalInstall();
+      const installCmd = isGlobal
+        ? `npm install -g ${PKG_NAME}@latest`
+        : `npm install ${PKG_NAME}@latest`;
+
+      this.log(`Running: ${installCmd}`);
+      this.exec(installCmd, 120000);
+
+      const newVersion = this.exec(`npm view ${PKG_NAME} version`, 15000);
+      this.log(`Update complete: ${previousVersion} -> ${newVersion}. Restarting...`);
+
+      setTimeout(() => restartProcess(this.channels), 500);
+
+      return { success: true, previousVersion, newVersion };
+    } catch (err: any) {
+      this.updating = false;
+      this.log(`Update failed: ${err.message}`);
+      return { success: false, previousVersion, newVersion: previousVersion, error: err.message };
+    }
+  }
+
+  private isGlobalInstall(): boolean {
+    try {
+      const globalPrefix = this.exec('npm prefix -g');
+      // If our package's path starts with the global prefix, it's a global install
+      return __dirname.startsWith(globalPrefix);
+    } catch {
+      return false;
     }
   }
 
@@ -142,7 +255,6 @@ export class Updater {
     const intervalMs = intervalMinutes * 60 * 1000;
     this.log(`Auto-update enabled: checking every ${intervalMinutes} minute(s)`);
 
-    // Initial check after a short delay
     setTimeout(() => this.autoUpdateCheck(), 10000);
 
     this.autoUpdateTimer = setInterval(() => this.autoUpdateCheck(), intervalMs);
@@ -160,7 +272,7 @@ export class Updater {
     try {
       const status = await this.checkForUpdate();
       if (status.updateAvailable) {
-        this.log(`Auto-update: new version detected (${status.remoteCommit}). Updating...`);
+        this.log(`Auto-update: new version detected (${status.latestVersion}). Updating...`);
         await this.performUpdate();
       }
     } catch (err: any) {

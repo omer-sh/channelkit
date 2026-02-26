@@ -56,7 +56,12 @@ export async function startCommand(configPath: string, opts: { tunnel?: boolean;
   });
 
   await kit.start();
-  
+
+  // Open the dashboard in the default browser
+  const dashboardUrl = `http://localhost:${port}/dashboard`;
+  const { exec: execCmd } = await import('child_process');
+  execCmd(`open "${dashboardUrl}" 2>/dev/null || xdg-open "${dashboardUrl}" 2>/dev/null || start "${dashboardUrl}" 2>/dev/null`);
+
   console.log();
   console.log(c('green', '  🚀 ChannelKit is running!\n'));
   console.log(c('dim', '  Press Ctrl+C to stop\n'));

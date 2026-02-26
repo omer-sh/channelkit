@@ -252,4 +252,12 @@ program
   .option('-p, --port <port>', 'Port to listen on', '3000')
   .action(demoCommand);
 
+// Default to "start" when no command is given
+const args = process.argv.slice(2);
+const knownCommands = program.commands.map(c => c.name());
+if (args.length === 0 || (args.length > 0 && !knownCommands.includes(args[0]) && !args[0].startsWith('-'))) {
+  // Inject "start" as the default command
+  process.argv.splice(2, 0, 'start');
+}
+
 program.parse();

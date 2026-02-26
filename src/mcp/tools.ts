@@ -355,20 +355,21 @@ export function registerTools(mcp: McpServer, ctx: McpContext): void {
         try {
           const updateStatus = await ctx.updater.checkForUpdate();
           version = {
-            current_commit: updateStatus.currentCommit,
-            remote_commit: updateStatus.remoteCommit,
+            mode: updateStatus.mode,
+            current_version: updateStatus.currentVersion,
+            latest_version: updateStatus.latestVersion,
             update_available: updateStatus.updateAvailable,
             behind_count: updateStatus.behindCount,
           };
         } catch {
-          version = { current_commit: ctx.updater.getCurrentCommit(), update_available: false };
+          version = { current_version: ctx.updater.getCurrentVersion(), update_available: false };
         }
       } else {
         try {
           const { execSync } = await import('child_process');
-          version.current_commit = execSync('git rev-parse --short HEAD', { cwd: process.cwd(), encoding: 'utf-8' }).trim();
+          version.current_version = execSync('git rev-parse --short HEAD', { cwd: process.cwd(), encoding: 'utf-8' }).trim();
         } catch {
-          version.current_commit = 'unknown';
+          version.current_version = 'unknown';
         }
       }
 
@@ -386,7 +387,7 @@ export function registerTools(mcp: McpServer, ctx: McpContext): void {
 
   mcp.tool(
     'update',
-    'Update ChannelKit to the latest version from GitHub. Pulls latest changes, installs dependencies, rebuilds, and restarts the process. The MCP connection will be lost after restart.',
+    'Update ChannelKit to the latest version. Pulls latest changes (git) or installs latest package (npm), and restarts the process. The MCP connection will be lost after restart.',
     {},
     async () => {
       if (!ctx.updater) {
@@ -395,7 +396,7 @@ export function registerTools(mcp: McpServer, ctx: McpContext): void {
       try {
         const result = await ctx.updater.performUpdate();
         if (result.success) {
-          return { content: [{ type: 'text', text: `Update successful: ${result.previousCommit} -> ${result.newCommit}. ChannelKit is restarting... The MCP connection will reconnect shortly.` }] };
+          return { content: [{ type: 'text', text: `Update successful: ${result.previousVersion} -> ${result.newVersion}. ChannelKit is restarting... The MCP connection will reconnect shortly.` }] };
         }
         return { content: [{ type: 'text', text: `Update failed: ${result.error}` }], isError: true };
       } catch (err: any) {

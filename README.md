@@ -23,6 +23,8 @@ Your app receives every message in a **unified JSON format**, regardless of sour
 - **Speech-to-Text** — automatic transcription of voice messages (Google, Whisper, Deepgram)
 - **Text-to-Speech** — voice responses when your webhook returns `voice: true` (Google, ElevenLabs, OpenAI)
 - **Auto language detection** — STT supports multiple languages with automatic detection
+- **AI formatting** — transform incoming messages with AI (OpenAI, Anthropic, Google) before forwarding to your webhook
+- **MCP server** — Model Context Protocol server lets AI assistants manage channels, services, and send messages
 - **Web dashboard** — SQLite-backed logs with real-time WebSocket updates
 - **Async messaging API** — `replyUrl` in every webhook payload for sending messages anytime
 - **Onboarding flow** — magic codes (WhatsApp) and slash commands (Telegram) for user self-service
@@ -31,20 +33,18 @@ Your app receives every message in a **unified JSON format**, regardless of sour
 ## Quick Start
 
 ```bash
-git clone https://github.com/dirbalak/channelkit.git
-cd channelkit
-npm install
-npm run init
+npm install -g @dirbalak/channelkit
+channelkit init
 ```
 
-The interactive wizard will guide you through setup — pick a channel, enter credentials, set a webhook URL, and you're done.
+The interactive wizard will guide you through setup — pick a channel, enter credentials, set a webhook URL, and you're done. When setup is complete, the dashboard opens automatically in your browser.
 
-### Running after initial setup
+### Running
 
 ```bash
-npm start                  # start with existing config
-npm run dev                # start with auto-reload (development)
-npm start -- -c my.yaml    # use a custom config file
+channelkit                         # start (opens dashboard automatically)
+channelkit start -c my.yaml        # use a custom config file
+channelkit start --tunnel           # start with a public URL (Cloudflare tunnel)
 ```
 
 ## CLI Commands
@@ -69,7 +69,7 @@ ChannelKit can route messages from a single channel to multiple backend services
 ### Add a service
 
 ```bash
-npm run service add
+channelkit service add
 # → Service name: Expenses
 # → Webhook: http://localhost:3000/expenses
 # → Enable STT? Enable TTS?
@@ -131,6 +131,56 @@ services:
 - Google: `GOOGLE_TTS_API_KEY` or `GOOGLE_API_KEY`
 - ElevenLabs: `ELEVENLABS_TTS_API_KEY` or `ELEVENLABS_API_KEY`
 - OpenAI: `OPENAI_TTS_API_KEY` or `OPENAI_API_KEY`
+
+## AI Formatting
+
+ChannelKit can pass incoming messages through an AI model before forwarding them to your webhook. This enables structured data extraction, translation, classification, and other transformations — all without changing your backend.
+
+The processing pipeline is: **STT** (optional) → **AI Format** → **Webhook**
+
+### Configuration
+
+```yaml
+services:
+  myapp:
+    channel: whatsapp
+    webhook: http://localhost:3000
+    format:
+      provider: openai         # openai | anthropic | google
+      model: gpt-4o-mini       # optional, each provider has a sensible default
+      prompt: "Extract the expense amount and category as JSON"
+```
+
+**Supported providers and defaults:**
+
+| Provider | Default Model | API Key |
+|----------|--------------|---------|
+| OpenAI | `gpt-4o-mini` | `OPENAI_API_KEY` |
+| Anthropic | `claude-sonnet-4-20250514` | `ANTHROPIC_API_KEY` |
+| Google | `gemini-2.5-flash` | `GOOGLE_API_KEY` |
+
+API keys can be set as environment variables or in `config.yaml`:
+
+```yaml
+settings:
+  openai_api_key: "sk-..."
+  anthropic_api_key: "sk-ant-..."
+  google_api_key: "..."
+```
+
+### Example
+
+With this prompt:
+```
+Extract: name, amount, category. Return JSON only.
+```
+
+A message like `"Paid $45 for lunch with Sarah"` becomes:
+```json
+{"name": "Sarah", "amount": 45, "category": "lunch"}
+```
+
+Your webhook receives the formatted text. The original text is preserved in the dashboard logs.
 
 ## Voice Channel (Twilio)
 
@@ -258,6 +308,60 @@ ChannelKit includes a built-in web dashboard (enabled by default) that shows:
 
 All logs are stored in SQLite (`data/logs.db`) with automatic 30-day retention.
 
+## MCP Server
+
+ChannelKit includes a [Model Context Protocol](https://modelcontextprotocol.io/) server that lets AI assistants (Claude, etc.) manage your messaging gateway programmatically.
+
+### Configuration
+
+```yaml
+mcp:
+  enabled: true
+  port: 4100              # HTTP transport port
+  stdio: true             # enable stdio transport (for Claude Desktop)
+  secret: "my-token"      # optional Bearer token for auth
+```
+
+### Available tools
+
+| Tool | Description |
+|------|-------------|
+| `send_message` | Send a message through any channel |
+| `get_messages` | Retrieve message history with search/filtering |
+| `list_channels` | View all channels and their status |
+| `add_channel` | Add a new channel (WhatsApp, Telegram, Email, SMS, Voice) |
+| `remove_channel` | Remove a channel |
+| `list_services` | View all services |
+| `add_service` | Create a service with STT/TTS/format config |
+| `update_service` | Modify service settings |
+| `remove_service` | Remove a service |
+| `get_status` | Get uptime, stats, version info, update availability |
+| `update` | Update ChannelKit to the latest version |
+| `set_config` | Set config values (e.g., `settings.openai_api_key`) |
+
+### Transports
+
+- **Streamable HTTP** — `http://localhost:4100/mcp` (modern clients)
+- **SSE** — `http://localhost:4100/sse` + `/messages` (legacy clients)
+- **Stdio** — for Claude Desktop and local integrations
+
+### Connecting from Claude Desktop
+
+Add to your Claude Desktop config (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "channelkit": {
+      "command": "channelkit",
+      "args": ["start", "--mcp-stdio"]
+    }
+  }
+}
+```
+
+Or connect to a running instance via HTTP at `http://localhost:4100/mcp`.
+
 ## Webhook API
 
 ### Your app receives
@@ -293,7 +397,7 @@ Or with voice:
 A test server is included for quick experimentation:
 
 ```bash
-node echo-server.js
+channelkit demo
 ```
 
 Runs on port 3000 and echoes back any message it receives.
@@ -316,13 +420,6 @@ git clone https://github.com/dirbalak/channelkit.git
 cd channelkit
 npm install
 npm run dev    # starts with auto-reload on code changes
-```
-
-## Docker
-
-```bash
-docker build -t channelkit .
-docker run -v ./config.yaml:/app/config.yaml -v ./auth:/app/auth channelkit
 ```
 
 ## License

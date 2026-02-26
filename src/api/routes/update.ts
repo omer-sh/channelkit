@@ -26,8 +26,8 @@ export function registerUpdateRoutes(app: Express, ctx: ServerContext): void {
         ctx.broadcast({
           type: 'updateStatus',
           updating: true,
-          previousCommit: result.previousCommit,
-          newCommit: result.newCommit,
+          previousVersion: result.previousVersion,
+          newVersion: result.newVersion,
         });
       }
       res.json(result);
