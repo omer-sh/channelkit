@@ -61,16 +61,20 @@ function parseMultipart(buf, boundary) {
 
 function handleRequest(req, msg, savedFile) {
   const channel = msg.channel || "?";
-  const type = msg.type || "text";
-  const from = msg.from || "?";
   const text = msg.text || "(no text)";
 
-  console.log(`\n📨 ${req.url} ← [${channel}] ${from}: ${text}`);
-  if (type !== "text") console.log(`   Type: ${type}`);
-  if (msg.senderName) console.log(`   Name: ${msg.senderName}`);
-  if (msg.email?.subject) console.log(`   Subject: ${msg.email.subject}`);
-  if (msg.media) console.log(`   Media: ${msg.media.mimetype || "unknown"} (${msg.media.filename || "no name"})`);
-  if (savedFile) console.log(`   💾 Saved: ${savedFile}`);
+  console.log(`\n${"=".repeat(60)}`);
+  console.log(`📨 Incoming Request`);
+  console.log(`${"=".repeat(60)}`);
+  console.log(`   Method:  ${req.method}`);
+  console.log(`   URL:     ${req.url}`);
+  console.log(`   Headers:`);
+  for (const [key, value] of Object.entries(req.headers)) {
+    console.log(`     ${key}: ${value}`);
+  }
+  console.log(`\n   Body (parsed):`);
+  console.log(JSON.stringify(msg, null, 2).split("\n").map(l => `     ${l}`).join("\n"));
+  if (savedFile) console.log(`\n   💾 Saved attachment: ${savedFile}`);
 
   let reply;
   if (req.url.startsWith("/expenses")) {

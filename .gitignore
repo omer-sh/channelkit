@@ -7,3 +7,4 @@ config.yaml
 groups.json
 data/
 .claude/
+uploads/
