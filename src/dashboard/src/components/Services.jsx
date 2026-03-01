@@ -337,9 +337,22 @@ function ServiceRowWithAudio({ name, svc, loadConfig, settings, audioTarget, set
   const [editAllowListEnabled, setEditAllowListEnabled] = useState(!!(svc.allow_list?.length));
   const [editAllowListText, setEditAllowListText] = useState((svc.allow_list || []).join(', '));
   const [showExample, setShowExample] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
+  const { tunnelActive, tunnelUrl } = useAppState();
   const showAudio = audioTarget === name;
   const isEndpoint = channels[svc.channel]?.type === 'endpoint';
   const isPhoneChannel = ['whatsapp', 'sms', 'voice'].includes(channels[svc.channel]?.type);
+
+  const endpointUrl = isEndpoint
+    ? `${tunnelActive && tunnelUrl ? tunnelUrl.replace(/\/$/, '') : window.location.origin}/inbound/endpoint/${encodeURIComponent(svc.channel)}`
+    : '';
+
+  function copyEndpointUrl() {
+    navigator.clipboard.writeText(endpointUrl).then(() => {
+      setCopiedUrl(true);
+      setTimeout(() => setCopiedUrl(false), 1500);
+    });
+  }
 
   function buildAuthPayload() {
     if (authType === 'bearer' && authToken) return { type: 'bearer', token: authToken };
@@ -455,6 +468,11 @@ function ServiceRowWithAudio({ name, svc, loadConfig, settings, audioTarget, set
           </td>
           <td className="px-6 py-4 text-xs text-dim">{svc.code || svc.command || '\u2014'}</td>
           <td className="px-6 py-4 text-right whitespace-nowrap space-x-1">
+            {isEndpoint && (
+              <button onClick={copyEndpointUrl} className="inline-flex items-center justify-center px-3 py-1 text-xs font-medium text-primary border border-primary/30 rounded hover:bg-primary/5 transition-colors align-middle" title={copiedUrl ? 'Copied!' : 'Copy endpoint URL'} style={{ height: '26px' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '14px', lineHeight: 1 }}>{copiedUrl ? 'check' : 'link'}</span>
+              </button>
+            )}
             {isEndpoint && <button onClick={() => setShowExample(true)} className="px-3 py-1 text-xs font-medium text-primary border border-primary/30 rounded hover:bg-primary/5 transition-colors">Example</button>}
             <button onClick={() => { setAudioTarget(showAudio ? null : name); setFormatTarget(null); }} className="px-3 py-1 text-xs font-medium text-primary border border-primary/30 rounded hover:bg-primary/5 transition-colors">Audio</button>
             <button onClick={() => { setFormatTarget(showFormat ? null : name); setAudioTarget(null); }} className="px-3 py-1 text-xs font-medium text-primary border border-primary/30 rounded hover:bg-primary/5 transition-colors">Format</button>

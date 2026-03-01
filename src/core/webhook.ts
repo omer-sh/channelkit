@@ -149,6 +149,14 @@ export async function dispatchWebhook(
         }
       }
 
+      // Text response (text/plain, text/csv, text/html, etc.) — return as text
+      if (contentType && contentType.includes('text/')) {
+        const text = await res.text();
+        if (text) {
+          return { text } as WebhookResponse;
+        }
+      }
+
       return null;
     } catch (err: any) {
       clearTimeout(timer);
