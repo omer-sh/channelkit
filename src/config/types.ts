@@ -161,6 +161,7 @@ export interface SettingsConfig {
   openai_api_key?: string;
   deepgram_api_key?: string;
   anthropic_api_key?: string;
+  allow_local_webhooks?: boolean;
 }
 
 export interface McpConfig {

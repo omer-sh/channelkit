@@ -61,6 +61,8 @@ export default function Settings() {
       for (const f of FIELDS) v[f.key] = s[f.key] || '';
       setValues(v);
       setOriginals({ ...v });
+      setAllowLocal(!!s.allow_local_webhooks);
+      setOrigAllowLocal(!!s.allow_local_webhooks);
     } catch (e) {
       console.error('Failed to load settings', e);
     }
@@ -72,6 +74,7 @@ export default function Settings() {
       const val = (values[f.key] || '').trim();
       if (val !== (originals[f.key] || '')) body[f.key] = val;
     }
+    if (allowLocal !== origAllowLocal) body.allow_local_webhooks = allowLocal;
     if (Object.keys(body).length === 0) {
       setStatus('No changes to save');
       setStatusColor('text-dim');
@@ -103,6 +106,9 @@ export default function Settings() {
   function update(key, val) {
     setValues(prev => ({ ...prev, [key]: val }));
   }
+
+  const [allowLocal, setAllowLocal] = useState(false);
+  const [origAllowLocal, setOrigAllowLocal] = useState(false);
 
   const twilioFields = FIELDS.filter(f => f.group === 'twilio');
   const apiFields = FIELDS.filter(f => f.group === 'api');
@@ -139,6 +145,18 @@ export default function Settings() {
               <SettingsInput key={f.key} label={f.label} placeholder={f.placeholder} sub={f.sub} value={values[f.key] || ''} onChange={v => update(f.key, v)} />
             ))}
           </div>
+          <label className="flex items-center gap-3 mt-4 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={allowLocal}
+              onChange={e => setAllowLocal(e.target.checked)}
+              className="w-4 h-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
+            />
+            <div>
+              <span className="text-xs font-medium text-text">Allow local webhooks</span>
+              <p className="text-[11px] text-dim mt-0.5">Allow webhooks to localhost and private IPs (e.g. 192.168.x.x, 10.x.x.x). Cloud metadata endpoints are always blocked.</p>
+            </div>
+          </label>
         </div>
 
         <div className="flex items-center gap-3 pt-2">

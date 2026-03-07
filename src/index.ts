@@ -16,6 +16,7 @@ import { TunnelManager } from './core/tunnel';
 import { loadConfig, saveConfig } from './config/parser';
 import { ChannelKitMcpServer } from './mcp';
 import { Updater } from './core/updater';
+import { setAllowLocalWebhooks } from './core/webhook';
 
 export class ChannelKit {
   private channels: Channel[] = [];
@@ -47,6 +48,10 @@ export class ChannelKit {
           process.env[envVar] = val;
         }
       }
+    }
+
+    if (config.settings?.allow_local_webhooks) {
+      setAllowLocalWebhooks(true);
     }
 
     this.router = new Router(config.services, config.routes);

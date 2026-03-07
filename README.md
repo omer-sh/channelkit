@@ -101,14 +101,15 @@ services:
     channel: whatsapp
     webhook: http://localhost:3000
     stt:
-      provider: google        # google | whisper | deepgram
-      language: he-IL          # primary language
-      alternative_languages:   # auto-detect from these + primary
+      provider: google # google | whisper | deepgram
+      language: he-IL # primary language
+      alternative_languages: # auto-detect from these + primary
         - en-US
         - ar-IL
 ```
 
 **API keys via environment variables:**
+
 - Google: `GOOGLE_STT_API_KEY` or `GOOGLE_API_KEY`
 - Whisper (OpenAI): `OPENAI_STT_API_KEY` or `OPENAI_API_KEY`
 - Deepgram: `DEEPGRAM_STT_API_KEY` or `DEEPGRAM_API_KEY`
@@ -123,11 +124,12 @@ services:
     channel: whatsapp
     webhook: http://localhost:3000
     tts:
-      provider: elevenlabs     # google | elevenlabs | openai
-      voice: 21m00Tcm4TlvDq8ikWAM  # optional voice ID
+      provider: elevenlabs # google | elevenlabs | openai
+      voice: 21m00Tcm4TlvDq8ikWAM # optional voice ID
 ```
 
 **API keys via environment variables:**
+
 - Google: `GOOGLE_TTS_API_KEY` or `GOOGLE_API_KEY`
 - ElevenLabs: `ELEVENLABS_TTS_API_KEY` or `ELEVENLABS_API_KEY`
 - OpenAI: `OPENAI_TTS_API_KEY` or `OPENAI_API_KEY`
@@ -146,18 +148,18 @@ services:
     channel: whatsapp
     webhook: http://localhost:3000
     format:
-      provider: openai         # openai | anthropic | google
-      model: gpt-4o-mini       # optional, each provider has a sensible default
+      provider: openai # openai | anthropic | google
+      model: gpt-4o-mini # optional, each provider has a sensible default
       prompt: "Extract the expense amount and category as JSON"
 ```
 
 **Supported providers and defaults:**
 
-| Provider | Default Model | API Key |
-|----------|--------------|---------|
-| OpenAI | `gpt-4o-mini` | `OPENAI_API_KEY` |
+| Provider  | Default Model              | API Key             |
+| --------- | -------------------------- | ------------------- |
+| OpenAI    | `gpt-4o-mini`              | `OPENAI_API_KEY`    |
 | Anthropic | `claude-sonnet-4-20250514` | `ANTHROPIC_API_KEY` |
-| Google | `gemini-2.5-flash` | `GOOGLE_API_KEY` |
+| Google    | `gemini-2.5-flash`         | `GOOGLE_API_KEY`    |
 
 API keys can be set as environment variables or in `config.yaml`:
 
@@ -171,13 +173,15 @@ settings:
 ### Example
 
 With this prompt:
+
 ```
 Extract: name, amount, category. Return JSON only.
 ```
 
 A message like `"Paid $45 for lunch with Sarah"` becomes:
+
 ```json
-{"name": "Sarah", "amount": 45, "category": "lunch"}
+{ "name": "Sarah", "amount": 45, "category": "lunch" }
 ```
 
 Your webhook receives the formatted text. The original text is preserved in the dashboard logs.
@@ -230,6 +234,82 @@ services:
 
 When your webhook returns `{ "voice": true }` and TTS is configured, ChannelKit synthesizes audio and plays it to the caller via `<Play>`. Audio clips are cached in memory and served via a one-time URL that expires after 60 seconds.
 
+## Gmail Channel Setup
+
+Setting up a Gmail channel requires creating OAuth2 credentials in Google Cloud Console. Here's a step-by-step guide:
+
+### 1. Create a Google Cloud project
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Click the project dropdown at the top and select **New Project**
+3. Enter a name (e.g. "ChannelKit") and click **Create**
+
+### 2. Enable the Gmail API
+
+1. In your project, go to **APIs & Services → Library**
+2. Search for **Gmail API**
+3. Click **Gmail API** and then **Enable**
+
+### 3. Configure the OAuth consent screen
+
+1. Go to **APIs & Services → OAuth consent screen**
+2. Select **External** user type (or **Internal** if using Google Workspace) and click **Create**
+3. Fill in the required fields:
+   - **App name**: e.g. "ChannelKit"
+   - **User support email**: your email
+   - **Developer contact email**: your email
+4. Click **Save and Continue**
+5. On the **Scopes** page, click **Add or Remove Scopes**
+6. Search for `https://www.googleapis.com/auth/gmail.modify` and check it
+7. Click **Update** → **Save and Continue**
+8. On the **Test users** page, click **Add Users** and add the Gmail address you want to connect
+9. Click **Save and Continue** → **Back to Dashboard**
+
+> **Note:** While your app is in "Testing" status, only the test users you added can authorize. This is fine for personal use. To remove the test user limitation, you'd need to publish the app and go through Google's verification process.
+
+### 4. Create OAuth2 credentials
+
+1. Go to **APIs & Services → Credentials**
+2. Click **Create Credentials → OAuth client ID**
+3. Select **Desktop app** as the application type
+4. Enter a name (e.g. "ChannelKit Desktop")
+5. Click **Create**
+6. Copy the **Client ID** and **Client Secret**
+
+### 5. Configure the channel
+
+Add the Gmail channel via CLI:
+
+```bash
+channelkit channel add
+# → Choose Email → Gmail
+# → Paste your Client ID and Client Secret
+# → Set poll interval (default 30 seconds)
+```
+
+Or add it directly to `config.yaml`:
+
+```yaml
+channels:
+  gmail:
+    type: email
+    provider: gmail
+    client_id: "123456789-abc.apps.googleusercontent.com"
+    client_secret: "GOCSPX-..."
+    poll_interval: 30
+```
+
+### 6. Authorize
+
+When you start ChannelKit, it will automatically open your browser for OAuth authorization. Sign in with the Gmail account you added as a test user, grant access, and the token is saved locally in `auth/gmail-<channel-name>.json`.
+
+```bash
+channelkit start
+# → Browser opens → sign in → authorize → done
+```
+
+The refresh token is saved automatically. You won't need to re-authorize unless you revoke access or delete the token file.
+
 ## Config
 
 ```yaml
@@ -251,7 +331,7 @@ services:
   expenses:
     channel: whatsapp
     webhook: "http://localhost:3000/expenses"
-    code: "EXPENSES"          # magic code for WhatsApp multi-service
+    code: "EXPENSES" # magic code for WhatsApp multi-service
     stt:
       provider: google
       language: he-IL
@@ -260,7 +340,7 @@ services:
   assistant:
     channel: telegram
     webhook: "http://localhost:3000/assistant"
-    command: "assistant"      # slash command for Telegram multi-service
+    command: "assistant" # slash command for Telegram multi-service
 ```
 
 ## Async Messaging API
@@ -273,25 +353,28 @@ Every webhook payload includes a `replyUrl` — a callback endpoint your service
 {
   "id": "msg_abc123",
   "channel": "whatsapp",
-  "from": "+972501234567",
+  "from": "+44123456789",
   "text": "What's my balance?",
-  "replyUrl": "http://localhost:4000/api/send/whatsapp/972501234567%40s.whatsapp.net"
+  "replyUrl": "http://localhost:4000/api/send/whatsapp/44123456789%40s.whatsapp.net"
 }
 ```
 
 ### Sync response (immediate)
+
 ```json
 { "text": "Your balance is $42.00" }
 ```
 
 ### Async message (anytime)
+
 ```bash
-curl -X POST "http://localhost:4000/api/send/whatsapp/972501234567%40s.whatsapp.net" \
+curl -X POST "http://localhost:4000/api/send/whatsapp/44123456789%40s.whatsapp.net" \
   -H "Content-Type: application/json" \
   -d '{"text": "Your invoice was approved! ✅"}'
 ```
 
 ### Health check
+
 ```
 GET http://localhost:4000/api/health
 → { "status": "ok", "channels": ["whatsapp"] }
@@ -317,27 +400,27 @@ ChannelKit includes a [Model Context Protocol](https://modelcontextprotocol.io/)
 ```yaml
 mcp:
   enabled: true
-  port: 4100              # HTTP transport port
-  stdio: true             # enable stdio transport (for Claude Desktop)
-  secret: "my-token"      # optional Bearer token for auth
+  port: 4100 # HTTP transport port
+  stdio: true # enable stdio transport (for Claude Desktop)
+  secret: "my-token" # optional Bearer token for auth
 ```
 
 ### Available tools
 
-| Tool | Description |
-|------|-------------|
-| `send_message` | Send a message through any channel |
-| `get_messages` | Retrieve message history with search/filtering |
-| `list_channels` | View all channels and their status |
-| `add_channel` | Add a new channel (WhatsApp, Telegram, Email, SMS, Voice) |
-| `remove_channel` | Remove a channel |
-| `list_services` | View all services |
-| `add_service` | Create a service with STT/TTS/format config |
-| `update_service` | Modify service settings |
-| `remove_service` | Remove a service |
-| `get_status` | Get uptime, stats, version info, update availability |
-| `update` | Update ChannelKit to the latest version |
-| `set_config` | Set config values (e.g., `settings.openai_api_key`) |
+| Tool             | Description                                               |
+| ---------------- | --------------------------------------------------------- |
+| `send_message`   | Send a message through any channel                        |
+| `get_messages`   | Retrieve message history with search/filtering            |
+| `list_channels`  | View all channels and their status                        |
+| `add_channel`    | Add a new channel (WhatsApp, Telegram, Email, SMS, Voice) |
+| `remove_channel` | Remove a channel                                          |
+| `list_services`  | View all services                                         |
+| `add_service`    | Create a service with STT/TTS/format config               |
+| `update_service` | Modify service settings                                   |
+| `remove_service` | Remove a service                                          |
+| `get_status`     | Get uptime, stats, version info, update availability      |
+| `update`         | Update ChannelKit to the latest version                   |
+| `set_config`     | Set config values (e.g., `settings.openai_api_key`)       |
 
 ### Transports
 
@@ -370,7 +453,7 @@ Or connect to a running instance via HTTP at `http://localhost:4100/mcp`.
 {
   "id": "msg_abc123",
   "channel": "whatsapp",
-  "from": "+972501234567",
+  "from": "+44123456789",
   "type": "text",
   "text": "What's the temperature?",
   "timestamp": 1708420200,
@@ -404,14 +487,14 @@ Runs on port 3000 and echoes back any message it receives.
 
 ## Supported Channels
 
-| Channel | Status | Multi-Service |
-|---------|--------|---------------|
+| Channel            | Status     | Multi-Service        |
+| ------------------ | ---------- | -------------------- |
 | WhatsApp (Baileys) | ✅ Working | Magic codes + groups |
-| Telegram (grammY) | ✅ Working | Slash commands |
-| Email — Gmail | ✅ Working | — |
-| Email — Resend | ✅ Working | — |
-| SMS (Twilio) | ✅ Working | — |
-| Voice (Twilio) | ✅ Working | — |
+| Telegram (grammY)  | ✅ Working | Slash commands       |
+| Email — Gmail      | ✅ Working | —                    |
+| Email — Resend     | ✅ Working | —                    |
+| SMS (Twilio)       | ✅ Working | —                    |
+| Voice (Twilio)     | ✅ Working | —                    |
 
 ## Development
 
@@ -440,24 +523,37 @@ ChannelKit is designed to run on a dedicated server. Follow these guidelines to 
 
 ### What's protected
 
-| Feature | Protection |
-|---------|-----------|
-| Dashboard & admin APIs | `api_secret` Bearer token |
-| WebSocket (real-time updates) | Token validated on connection |
-| `/api/send` endpoint | `api_secret` Bearer token |
-| MCP server | `mcp.secret` Bearer token (external only) |
-| Inbound webhooks (Twilio) | Request signature verification |
-| Inbound webhooks (Resend) | Svix signature verification |
-| Endpoint channels | Optional `X-Channel-Secret` header |
+| Feature                       | Protection                                |
+| ----------------------------- | ----------------------------------------- |
+| Dashboard & admin APIs        | `api_secret` Bearer token                 |
+| WebSocket (real-time updates) | Token validated on connection             |
+| `/api/send` endpoint          | `api_secret` Bearer token                 |
+| MCP server                    | `mcp.secret` Bearer token (external only) |
+| Inbound webhooks (Twilio)     | Request signature verification            |
+| Inbound webhooks (Resend)     | Svix signature verification               |
+| Endpoint channels             | Optional `X-Channel-Secret` header        |
 
 ### Additional hardening
 
 - Rate limiting is applied to all endpoints (60/min for send, 120/min for inbound, 300/min for dashboard)
 - Security headers (CSP, X-Frame-Options, etc.) are set via `helmet`
-- Webhook URLs are validated against private IP ranges (SSRF protection)
+- Webhook URLs are validated against private IP ranges (SSRF protection) — see [Local webhooks](#local-webhooks) to allow localhost/private IPs
 - Channel/service names are restricted to alphanumeric characters, hyphens, and underscores
 - Sensitive fields (API keys, tokens) are masked in API responses
 - Server log broadcasts redact common API key patterns
+
+### Local webhooks
+
+By default, ChannelKit blocks webhook requests to `localhost`, `127.0.0.1`, and private IP ranges (`10.x`, `172.16-31.x`, `192.168.x`) as SSRF protection. Cloud metadata endpoints (`169.254.169.254`) are **always** blocked regardless of this setting.
+
+If your webhook server runs locally or on a private network, add this to your `config.yaml`:
+
+```yaml
+settings:
+  allow_local_webhooks: true
+```
+
+This is common during development or when ChannelKit and your app run on the same machine or local network.
 
 ## License
 

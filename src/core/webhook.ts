@@ -1,13 +1,22 @@
 import { UnifiedMessage, WebhookResponse } from './types';
 import { ServiceAuthConfig } from '../config/types';
 
+let localWebhooksAllowed = false;
+
+/** Call at startup to allow webhooks to localhost / private IPs. */
+export function setAllowLocalWebhooks(value: boolean): void {
+  localWebhooksAllowed = value;
+}
+
 /** Block requests to private/reserved IP ranges and cloud metadata endpoints. */
 function isBlockedUrl(urlStr: string): boolean {
   try {
     const parsed = new URL(urlStr);
     const hostname = parsed.hostname;
-    // Block cloud metadata endpoints
+    // Always block cloud metadata endpoints
     if (hostname === '169.254.169.254' || hostname === 'metadata.google.internal') return true;
+    // Allow localhost and private IPs when configured
+    if (localWebhooksAllowed) return false;
     // Block localhost and loopback
     if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '0.0.0.0') return true;
     // Block private IP ranges (10.x, 172.16-31.x, 192.168.x)

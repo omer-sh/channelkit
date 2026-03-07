@@ -423,6 +423,19 @@ export function registerConfigRoutes(app: Express, ctx: ServerContext): void {
     }
   });
 
+  // GET /api/config/channels/:name/secret — return the raw secret for clipboard copy
+  app.get('/api/config/channels/:name/secret', (req, res) => {
+    if (!ctx.configPath) { res.status(503).json({ error: 'Config path not set' }); return; }
+    try {
+      const config = loadConfig(ctx.configPath, { validate: false });
+      const ch = config.channels[req.params.name];
+      if (!ch) { res.status(404).json({ error: 'Channel not found' }); return; }
+      res.json({ secret: (ch as any).secret || '' });
+    } catch (err: any) {
+      console.error('[config]', err); res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   // DELETE /api/config/channels/:name — remove a channel and its dependent services
   app.delete('/api/config/channels/:name', (req, res) => {
     if (!ctx.configPath) { res.status(503).json({ error: 'Config path not set' }); return; }
@@ -490,6 +503,127 @@ export function registerConfigRoutes(app: Express, ctx: ServerContext): void {
       setTimeout(() => {
         tempChannel.disconnect().catch(() => {});
       }, 65000);
+    } catch (err: any) {
+      console.error('[config]', err);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // POST /api/config/channels/:name/gmail-auth — trigger Gmail OAuth flow
+  app.post('/api/config/channels/:name/gmail-auth', async (req, res) => {
+    if (!ctx.configPath) { res.status(503).json({ error: 'Config path not set' }); return; }
+    const { name } = req.params;
+    try {
+      const config = loadConfig(ctx.configPath, { validate: false });
+      const ch = config.channels[name];
+      if (!ch) { res.status(404).json({ error: `Channel "${name}" not found` }); return; }
+      if (ch.type !== 'email' || (ch as any).provider !== 'gmail') {
+        res.status(400).json({ error: 'Only Gmail channels support OAuth' }); return;
+      }
+
+      const emailConfig = ch as any;
+      const http = await import('http');
+      const { join, dirname } = await import('path');
+      const { existsSync, mkdirSync, writeFileSync } = await import('fs');
+
+      // Check if already authenticated
+      const tokenPath = join('./auth', `gmail-${name}.json`);
+      if (existsSync(tokenPath)) {
+        try {
+          const tokens = JSON.parse(require('fs').readFileSync(tokenPath, 'utf-8'));
+          if (tokens?.refresh_token) {
+            res.json({ ok: true, already_authenticated: true });
+            ctx.broadcast({ type: 'gmail-auth-success', channel: name });
+            return;
+          }
+        } catch {}
+      }
+
+      // Start a temporary HTTP server for the OAuth callback
+      const server = http.createServer(async (cbReq, cbRes) => {
+        const url = new URL(cbReq.url || '/', `http://localhost`);
+        const authCode = url.searchParams.get('code');
+        const error = url.searchParams.get('error');
+
+        if (error) {
+          cbRes.writeHead(200, { 'Content-Type': 'text/html' });
+          cbRes.end('<html><body style="font-family:system-ui;text-align:center;padding:60px"><h2>Authorization failed</h2><p>You can close this tab and return to the dashboard.</p></body></html>');
+          server.close();
+          ctx.broadcast({ type: 'gmail-auth-error', channel: name, error: `OAuth error: ${error}` });
+          return;
+        }
+
+        if (!authCode) {
+          cbRes.writeHead(400, { 'Content-Type': 'text/plain' });
+          cbRes.end('Missing code parameter');
+          return;
+        }
+
+        // Exchange code for tokens
+        try {
+          const addr = server.address() as { port: number };
+          const redirectUri = `http://localhost:${addr.port}`;
+          const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              code: authCode,
+              client_id: emailConfig.client_id,
+              client_secret: emailConfig.client_secret,
+              redirect_uri: redirectUri,
+              grant_type: 'authorization_code',
+            }),
+          });
+
+          if (!tokenRes.ok) {
+            const err = await tokenRes.text();
+            throw new Error(`Token exchange failed: ${err}`);
+          }
+
+          const data = await tokenRes.json() as any;
+          const tokens = {
+            access_token: data.access_token,
+            refresh_token: data.refresh_token,
+            expiry: Date.now() + (data.expires_in * 1000),
+          };
+
+          // Save tokens
+          const dir = dirname(tokenPath);
+          if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+          writeFileSync(tokenPath, JSON.stringify(tokens, null, 2));
+
+          cbRes.writeHead(200, { 'Content-Type': 'text/html' });
+          cbRes.end('<html><body style="font-family:system-ui;text-align:center;padding:60px"><h2>Gmail authenticated successfully!</h2><p>You can close this tab and return to the dashboard.</p></body></html>');
+          server.close();
+          ctx.broadcast({ type: 'gmail-auth-success', channel: name });
+        } catch (err: any) {
+          cbRes.writeHead(200, { 'Content-Type': 'text/html' });
+          cbRes.end(`<html><body style="font-family:system-ui;text-align:center;padding:60px"><h2>Authentication failed</h2><p>${err.message}</p></body></html>`);
+          server.close();
+          ctx.broadcast({ type: 'gmail-auth-error', channel: name, error: err.message });
+        }
+      });
+
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+      const addr = server.address() as { port: number };
+      const redirectUri = `http://localhost:${addr.port}`;
+
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${encodeURIComponent(emailConfig.client_id)}` +
+        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+        `&response_type=code` +
+        `&scope=${encodeURIComponent('https://www.googleapis.com/auth/gmail.modify')}` +
+        `&access_type=offline` +
+        `&prompt=consent`;
+
+      // Timeout after 2 minutes
+      setTimeout(() => {
+        server.close();
+        ctx.broadcast({ type: 'gmail-auth-error', channel: name, error: 'OAuth timeout — no callback received within 2 minutes' });
+      }, 120000);
+
+      res.json({ ok: true, auth_url: authUrl });
+      ctx.broadcast({ type: 'gmail-auth-url', channel: name, authUrl });
     } catch (err: any) {
       console.error('[config]', err);
       res.status(500).json({ error: 'Internal server error' });

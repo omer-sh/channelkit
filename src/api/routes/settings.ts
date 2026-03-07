@@ -1,6 +1,7 @@
 import { Express } from 'express';
 import { ServerContext } from '../types';
 import { loadConfig, saveConfig } from '../../config/parser';
+import { setAllowLocalWebhooks } from '../../core/webhook';
 
 export function registerSettingsRoutes(app: Express, ctx: ServerContext): void {
   app.get('/api/settings', (_req, res) => {
@@ -8,9 +9,11 @@ export function registerSettingsRoutes(app: Express, ctx: ServerContext): void {
     try {
       const config = loadConfig(ctx.configPath, { validate: false });
       const settings = config.settings || {};
-      const masked: Record<string, string> = {};
+      const masked: Record<string, any> = {};
       for (const [key, val] of Object.entries(settings)) {
-        if (typeof val === 'string' && val.length > 0) {
+        if (typeof val === 'boolean') {
+          masked[key] = val;
+        } else if (typeof val === 'string' && val.length > 0) {
           masked[key] = val.length > 4 ? '•'.repeat(val.length - 4) + val.slice(-4) : '••••';
         } else {
           masked[key] = '';
@@ -66,6 +69,12 @@ export function registerSettingsRoutes(app: Express, ctx: ServerContext): void {
             delete process.env[envMap[key]];
           }
         }
+      }
+      // Handle allow_local_webhooks (boolean toggle)
+      if ('allow_local_webhooks' in req.body) {
+        const val = !!req.body['allow_local_webhooks'];
+        (config.settings as any).allow_local_webhooks = val;
+        setAllowLocalWebhooks(val);
       }
       if (Object.keys(config.settings).length === 0) delete config.settings;
       // Handle mcp_secret → config.mcp.secret

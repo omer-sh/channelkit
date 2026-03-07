@@ -11,11 +11,12 @@ const CHANNEL_FIELDS = {
   telegram: { note: 'Create a bot at @BotFather and paste the token here.', fields: [{ key: 'bot_token', label: 'Bot Token', placeholder: '123456:ABC-DEF1234...' }] },
   'sms-twilio': { note: 'Twilio console: Account SID and Auth Token from the dashboard.', fields: [{ key: 'account_sid', label: 'Account SID', placeholder: 'ACxxxxxxx' }, { key: 'auth_token', label: 'Auth Token', placeholder: '' }, { key: 'number', label: 'Phone Number', placeholder: '+12025551234' }] },
   'voice-twilio': { note: 'Same credentials as SMS. Voice and SMS can share credentials but need separate channels.', fields: [{ key: 'account_sid', label: 'Account SID', placeholder: 'ACxxxxxxx' }, { key: 'auth_token', label: 'Auth Token', placeholder: '' }, { key: 'number', label: 'Phone Number', placeholder: '+12025551234' }] },
+  'email-gmail': { note: 'Create OAuth2 credentials (Desktop app) at console.cloud.google.com/apis/credentials. Enable the Gmail API.', fields: [{ key: 'client_id', label: 'OAuth Client ID', placeholder: 'xxxx.apps.googleusercontent.com' }, { key: 'client_secret', label: 'OAuth Client Secret', placeholder: '' }] },
   'email-resend': { note: 'Get your API key from resend.com.', fields: [{ key: 'api_key', label: 'API Key', placeholder: 're_xxxxxxx' }, { key: 'from_email', label: 'From Email', placeholder: 'support@yourdomain.com' }] },
   'endpoint': { note: 'Expose a URL that external systems can call.', fields: [{ key: 'method', label: 'HTTP Method', placeholder: 'POST' }, { key: 'secret', label: 'Secret Key (optional)', placeholder: 'A secret for X-Channel-Secret header' }] },
 };
 
-const TYPE_LABELS = { whatsapp: 'WhatsApp', telegram: 'Telegram', 'sms-twilio': 'SMS (Twilio)', 'voice-twilio': 'Voice (Twilio)', 'email-resend': 'Email (Resend)', 'endpoint': 'Endpoint (Webhook)' };
+const TYPE_LABELS = { whatsapp: 'WhatsApp', telegram: 'Telegram', 'sms-twilio': 'SMS (Twilio)', 'voice-twilio': 'Voice (Twilio)', 'email-gmail': 'Email (Gmail)', 'email-resend': 'Email (Resend)', 'endpoint': 'Endpoint (Webhook)' };
 
 const COUNTRIES = [
   { code: 'US', label: 'United States (+1)' }, { code: 'GB', label: 'United Kingdom (+44)' },
@@ -76,6 +77,69 @@ function QRModal({ channel, qrMessage, onClose }) {
         <div className="text-sm text-dim mb-5">Open WhatsApp &rarr; Settings &rarr; Linked Devices &rarr; Link a Device</div>
         {body}
         {timer > 0 && qrMessage?.type !== 'whatsapp-paired' && qrMessage?.type !== 'whatsapp-pair-error' && (
+          <div className="text-xs text-dim mb-4">{timer}s remaining</div>
+        )}
+        <button onClick={onClose} className="px-4 py-2 border border-border rounded-lg text-sm text-dim hover:bg-bg-light transition-colors">Close</button>
+      </div>
+    </div>
+  );
+}
+
+function GmailAuthModal({ channel, qrMessage, onClose }) {
+  const [timer, setTimer] = useState(120);
+  const intervalRef = useRef(null);
+
+  useEffect(() => {
+    intervalRef.current = setInterval(() => setTimer(t => Math.max(0, t - 1)), 1000);
+    return () => clearInterval(intervalRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (qrMessage?.type === 'gmail-auth-success' || qrMessage?.type === 'gmail-auth-error') {
+      clearInterval(intervalRef.current);
+    }
+  }, [qrMessage]);
+
+  // Auto-open the auth URL when it arrives
+  useEffect(() => {
+    if (qrMessage?.type === 'gmail-auth-url' && qrMessage.channel === channel && qrMessage.authUrl) {
+      window.open(qrMessage.authUrl, '_blank');
+    }
+  }, [qrMessage, channel]);
+
+  let body;
+  if (qrMessage?.type === 'gmail-auth-success' && qrMessage.channel === channel) {
+    body = (
+      <div className="py-10 text-center text-green text-base font-semibold">
+        <span className="material-symbols-outlined text-5xl mb-3 block">check_circle</span>
+        Gmail authenticated successfully!
+        <br /><span className="text-xs font-normal text-dim">Restart the server to start receiving emails.</span>
+      </div>
+    );
+  } else if (qrMessage?.type === 'gmail-auth-error' && qrMessage.channel === channel) {
+    body = <div className="py-10 text-center text-red text-sm">{qrMessage.error || 'Authentication failed'}</div>;
+  } else if (qrMessage?.type === 'gmail-auth-url' && qrMessage.channel === channel) {
+    body = (
+      <div className="py-6 space-y-4">
+        <p className="text-sm text-dim">A browser window should have opened for Google authorization.</p>
+        <p className="text-xs text-dim">If it didn't open automatically, click the button below:</p>
+        <a href={qrMessage.authUrl} target="_blank" rel="noopener noreferrer"
+          className="inline-block px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary-hover transition-colors no-underline">
+          Open Google Authorization
+        </a>
+      </div>
+    );
+  } else {
+    body = <div className="py-16 text-dim text-sm">Starting OAuth flow...</div>;
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+      <div className="bg-surface rounded-xl p-8 max-w-md w-[90%] text-center shadow-2xl">
+        <h3 className="text-base font-semibold mb-1">Gmail OAuth &mdash; {channel}</h3>
+        <div className="text-sm text-dim mb-5">Authorize ChannelKit to access your Gmail account</div>
+        {body}
+        {timer > 0 && qrMessage?.type !== 'gmail-auth-success' && qrMessage?.type !== 'gmail-auth-error' && (
           <div className="text-xs text-dim mb-4">{timer}s remaining</div>
         )}
         <button onClick={onClose} className="px-4 py-2 border border-border rounded-lg text-sm text-dim hover:bg-bg-light transition-colors">Close</button>
@@ -412,8 +476,10 @@ export default function Channels({ loadConfig }) {
   const [smsPollInterval, setSmsPollInterval] = useState(60);
   const [emailInbound, setEmailInbound] = useState('webhook');
   const [emailPollInterval, setEmailPollInterval] = useState(30);
+  const [gmailPollInterval, setGmailPollInterval] = useState(30);
   const [showBuy, setShowBuy] = useState(false);
   const [qrChannel, setQrChannel] = useState(null);
+  const [gmailAuthChannel, setGmailAuthChannel] = useState(null);
   const [smsSettingsTarget, setSmsSettingsTarget] = useState(null);
   const [emailSettingsTarget, setEmailSettingsTarget] = useState(null);
   const [endpointResponseMode, setEndpointResponseMode] = useState('sync');
@@ -421,6 +487,7 @@ export default function Channels({ loadConfig }) {
   const [allowListEnabled, setAllowListEnabled] = useState(false);
   const [allowListText, setAllowListText] = useState('');
   const [allowListTarget, setAllowListTarget] = useState(null);
+  const [copiedSecret, setCopiedSecret] = useState(null);
 
   useEffect(() => { loadConfig(); }, [loadConfig]);
 
@@ -471,6 +538,13 @@ export default function Channels({ loadConfig }) {
       const num = fieldValues.number?.trim();
       if (!sid || !tok || !num) { alert('Account SID, Auth Token and Phone Number are required'); return; }
       Object.assign(body, { type: 'voice', provider: 'twilio', account_sid: sid, auth_token: tok, number: num });
+    } else if (typeKey === 'email-gmail') {
+      const cid = fieldValues.client_id?.trim();
+      const csecret = fieldValues.client_secret?.trim();
+      if (!cid || !csecret) { alert('Client ID and Client Secret are required'); return; }
+      Object.assign(body, { type: 'email', provider: 'gmail', client_id: cid, client_secret: csecret });
+      const pi = parseInt(gmailPollInterval);
+      if (pi && pi !== 30) body.poll_interval = pi;
     } else if (typeKey === 'email-resend') {
       const key = fieldValues.api_key?.trim();
       const from = fieldValues.from_email?.trim();
@@ -514,6 +588,9 @@ export default function Channels({ loadConfig }) {
     if (typeKey === 'whatsapp') {
       backToPicker(); loadConfig(); startPairing(name); return;
     }
+    if (typeKey === 'email-gmail') {
+      backToPicker(); loadConfig(); startGmailAuth(name); return;
+    }
     backToPicker(); loadConfig();
   }
 
@@ -528,6 +605,22 @@ export default function Channels({ loadConfig }) {
       }
     } catch (e) {
       dispatch({ type: 'SET_QR_MESSAGE', payload: { type: 'whatsapp-pair-error', channel: channelName, error: e.message } });
+    }
+  }
+
+  async function startGmailAuth(channelName) {
+    setGmailAuthChannel(channelName);
+    dispatch({ type: 'SET_QR_MESSAGE', payload: null });
+    try {
+      const res = await apiFetch(API + '/api/config/channels/' + encodeURIComponent(channelName) + '/gmail-auth', { method: 'POST' });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        dispatch({ type: 'SET_QR_MESSAGE', payload: { type: 'gmail-auth-error', channel: channelName, error: d.error || 'Failed to start OAuth' } });
+      } else if (d.already_authenticated) {
+        dispatch({ type: 'SET_QR_MESSAGE', payload: { type: 'gmail-auth-success', channel: channelName } });
+      }
+    } catch (e) {
+      dispatch({ type: 'SET_QR_MESSAGE', payload: { type: 'gmail-auth-error', channel: channelName, error: e.message } });
     }
   }
 
@@ -637,6 +730,18 @@ export default function Channels({ loadConfig }) {
                         )}
                         {isSms && <button onClick={() => setSmsSettingsTarget(smsSettingsTarget === name ? null : name)} className="px-3 py-1 text-xs font-medium text-primary border border-primary/30 rounded hover:bg-primary/5 transition-colors">Settings</button>}
                         {isResendEmail && <button onClick={() => setEmailSettingsTarget(emailSettingsTarget === name ? null : name)} className="px-3 py-1 text-xs font-medium text-primary border border-primary/30 rounded hover:bg-primary/5 transition-colors">Settings</button>}
+                        {ch.type === 'email' && ch.provider === 'gmail' && <button onClick={() => startGmailAuth(name)} className="px-3 py-1 text-xs font-medium text-primary border border-primary/30 rounded hover:bg-primary/5 transition-colors">Authenticate</button>}
+                        {ch.type === 'endpoint' && ch.secret && (
+                          <button onClick={async () => {
+                            try {
+                              const r = await apiFetch(API + '/api/config/channels/' + encodeURIComponent(name) + '/secret');
+                              const d = await r.json();
+                              if (d.secret) { navigator.clipboard.writeText(d.secret); setCopiedSecret(name); setTimeout(() => setCopiedSecret(null), 1500); }
+                            } catch {}
+                          }} className="px-3 py-1 text-xs font-medium text-primary border border-primary/30 rounded hover:bg-primary/5 transition-colors">
+                            {copiedSecret === name ? 'Copied!' : 'Copy Secret'}
+                          </button>
+                        )}
                         <button onClick={() => removeChannel(name, deps)} className="px-3 py-1 text-xs font-medium text-red border border-red/30 rounded hover:bg-red-light transition-colors">Remove</button>
                       </td>
                     </tr>
@@ -705,6 +810,7 @@ export default function Channels({ loadConfig }) {
                 { type: 'telegram', label: 'Telegram', sub: 'Bot via BotFather' },
                 { type: 'sms-twilio', label: 'SMS', sub: 'Twilio' },
                 { type: 'voice-twilio', label: 'Voice', sub: 'Twilio' },
+                { type: 'email-gmail', label: 'Email', sub: 'Gmail (OAuth2)' },
                 { type: 'email-resend', label: 'Email', sub: 'Resend' },
                 { type: 'endpoint', label: 'Endpoint', sub: 'HTTP Webhook' },
               ].map(t => (
@@ -761,6 +867,13 @@ export default function Channels({ loadConfig }) {
                 {smsInbound === 'webhook' && !tunnelActive && (
                   <div className="p-3 rounded-lg text-xs bg-yellow-light text-yellow border border-yellow/20">Service is not externalized. Please <strong>Externalize</strong> first.</div>
                 )}
+              </div>
+            )}
+
+            {typeKey === 'email-gmail' && (
+              <div className="space-y-3 mb-3">
+                <input type="number" value={gmailPollInterval} onChange={e => setGmailPollInterval(e.target.value)} min="5" max="3600" placeholder="Poll interval in seconds (default: 30)" className={inputCls} />
+                <p className="text-xs text-dim">On first start, a browser window will open for OAuth consent.</p>
               </div>
             )}
 
@@ -829,6 +942,10 @@ export default function Channels({ loadConfig }) {
 
       {qrChannel && (
         <QRModal channel={qrChannel} qrMessage={qrMessage} onClose={() => setQrChannel(null)} />
+      )}
+
+      {gmailAuthChannel && (
+        <GmailAuthModal channel={gmailAuthChannel} qrMessage={qrMessage} onClose={() => setGmailAuthChannel(null)} />
       )}
     </>
   );

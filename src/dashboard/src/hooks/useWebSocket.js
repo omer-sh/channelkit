@@ -65,7 +65,10 @@ export function useWebSocket(dispatch) {
           if (
             msg.type === 'whatsapp-qr' ||
             msg.type === 'whatsapp-paired' ||
-            msg.type === 'whatsapp-pair-error'
+            msg.type === 'whatsapp-pair-error' ||
+            msg.type === 'gmail-auth-url' ||
+            msg.type === 'gmail-auth-success' ||
+            msg.type === 'gmail-auth-error'
           ) {
             dispatch({ type: 'SET_QR_MESSAGE', payload: msg });
           }
