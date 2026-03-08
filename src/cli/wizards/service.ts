@@ -2,9 +2,10 @@ import { resolve } from 'path';
 import { existsSync } from 'fs';
 import { createInterface } from 'readline';
 import { c, ask, select, promptApiKey } from '../helpers';
+import { DEFAULT_CONFIG_PATH } from '../../paths';
 
-export async function serviceAddWizard(opts: { config: string } = { config: 'config.yaml' }, rl?: ReturnType<typeof createInterface>) {
-  const configPath = typeof opts.config === 'string' ? resolve(opts.config) : resolve('config.yaml');
+export async function serviceAddWizard(opts: { config: string } = { config: DEFAULT_CONFIG_PATH }, rl?: ReturnType<typeof createInterface>) {
+  const configPath = typeof opts.config === 'string' ? resolve(opts.config) : resolve(DEFAULT_CONFIG_PATH);
   if (!existsSync(configPath)) {
     console.error(c('yellow', `\n  ❌ Config file not found: ${configPath}\n  Run 'channelkit init' first.\n`));
     process.exit(1);

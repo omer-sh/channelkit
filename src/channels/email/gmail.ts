@@ -12,6 +12,7 @@ import { GmailChannelConfig } from '../../config/types';
 import { UnifiedMessage, WebhookResponse } from '../../core/types';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
+import { DEFAULT_AUTH_DIR } from '../../paths';
 
 interface GmailTokens {
   access_token: string;
@@ -28,7 +29,7 @@ export class GmailChannel extends Channel {
 
   constructor(name: string, config: GmailChannelConfig) {
     super(name, config);
-    this.tokenPath = join('./auth', `gmail-${name}.json`);
+    this.tokenPath = join(DEFAULT_AUTH_DIR, `gmail-${name}.json`);
   }
 
   private get cfg(): GmailChannelConfig {

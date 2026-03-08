@@ -2,6 +2,7 @@ import { Express } from 'express';
 import { ServerContext } from '../types';
 import { loadConfig, saveConfig } from '../../config/parser';
 import { WhatsAppChannel } from '../../channels/whatsapp';
+import { DEFAULT_AUTH_DIR } from '../../paths';
 
 /** Keys in channel configs that contain secrets and should be masked in API responses. */
 const SENSITIVE_CHANNEL_KEYS = ['api_key', 'bot_token', 'auth_token', 'client_secret', 'webhook_secret', 'secret'];
@@ -473,7 +474,7 @@ export function registerConfigRoutes(app: Express, ctx: ServerContext): void {
 
       const { rm } = await import('fs/promises');
       const { join } = await import('path');
-      const authDir = join(process.cwd(), 'auth', `whatsapp-${name}`);
+      const authDir = join(DEFAULT_AUTH_DIR, `whatsapp-${name}`);
 
       await rm(authDir, { recursive: true, force: true });
 
@@ -527,7 +528,7 @@ export function registerConfigRoutes(app: Express, ctx: ServerContext): void {
       const { existsSync, mkdirSync, writeFileSync } = await import('fs');
 
       // Check if already authenticated
-      const tokenPath = join('./auth', `gmail-${name}.json`);
+      const tokenPath = join(DEFAULT_AUTH_DIR, `gmail-${name}.json`);
       if (existsSync(tokenPath)) {
         try {
           const tokens = JSON.parse(require('fs').readFileSync(tokenPath, 'utf-8'));

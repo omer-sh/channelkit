@@ -1,6 +1,7 @@
 import { createInterface } from 'readline';
 import { existsSync, readFileSync, appendFileSync } from 'fs';
 import { join, dirname, resolve } from 'path';
+import { CHANNELKIT_HOME } from '../paths';
 
 export const LOGO = `
   ╔═══════════════════════════════════════╗

@@ -12,6 +12,7 @@ import { join } from 'path';
 import { Channel } from '../base';
 import { WhatsAppChannelConfig } from '../../config/types';
 import { UnifiedMessage, WebhookResponse } from '../../core/types';
+import { DEFAULT_AUTH_DIR } from '../../paths';
 
 export class WhatsAppChannel extends Channel {
   /**
@@ -100,7 +101,7 @@ export class WhatsAppChannel extends Channel {
   private reconnectAttempts = 0;
   private static readonly MAX_RECONNECT_ATTEMPTS = 10;
 
-  constructor(name: string, config: WhatsAppChannelConfig, authDir = './auth') {
+  constructor(name: string, config: WhatsAppChannelConfig, authDir = DEFAULT_AUTH_DIR) {
     super(name, config);
     this.authDir = join(authDir, `whatsapp-${name}`);
   }

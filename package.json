@@ -34,6 +34,7 @@
   ],
   "author": "dirbalak",
   "license": "MIT",
+  "preferGlobal": true,
   "dependencies": {
     "@hapi/boom": "^10.0.1",
     "@modelcontextprotocol/sdk": "^1.27.1",

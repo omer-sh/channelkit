@@ -2,6 +2,7 @@ import { resolve, join } from 'path';
 import { existsSync } from 'fs';
 import { createInterface } from 'readline';
 import { c, ask, select } from '../helpers';
+import { DEFAULT_AUTH_DIR } from '../../paths';
 
 export async function channelAddWizard(opts: { config: string }) {
   const configPath = resolve(opts.config);
@@ -214,7 +215,7 @@ export async function channelAddWizard(opts: { config: string }) {
       console.log(c('dim', '  Open WhatsApp → Settings → Linked Devices → Link a Device\n'));
       try {
         const { WhatsAppChannel } = await import('../../channels/whatsapp');
-        const authPath = join('.', 'auth', `whatsapp-${channelName}`);
+        const authPath = join(DEFAULT_AUTH_DIR, `whatsapp-${channelName}`);
         await WhatsAppChannel.pair(authPath);
         console.log(c('green', '\n  ✅ WhatsApp connected!\n'));
       } catch (err: any) {

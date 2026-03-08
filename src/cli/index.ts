@@ -5,6 +5,7 @@ import { resolve, join } from 'path';
 import { existsSync } from 'fs';
 import { createInterface } from 'readline';
 import { c, ask } from './helpers';
+import { DEFAULT_CONFIG_PATH } from '../paths';
 import { initCommand } from './commands/init';
 import { startCommand } from './commands/start';
 import { sendCommand } from './commands/send';
@@ -35,7 +36,7 @@ program
 program
   .command('start')
   .description('Start ChannelKit')
-  .option('-c, --config <path>', 'Path to config file', 'config.yaml')
+  .option('-c, --config <path>', 'Path to config file', DEFAULT_CONFIG_PATH)
   .option('--tunnel', 'Start a cloudflared tunnel automatically')
   .option('--public-url <url>', 'Use a manual public URL')
   .action(async (opts) => {
@@ -51,13 +52,13 @@ const service = program
 service
   .command('add')
   .description('Add a new service interactively')
-  .option('-c, --config <path>', 'Path to config file', 'config.yaml')
+  .option('-c, --config <path>', 'Path to config file', DEFAULT_CONFIG_PATH)
   .action((opts) => serviceAddWizard(opts));
 
 service
   .command('list')
   .description('List all configured services')
-  .option('-c, --config <path>', 'Path to config file', 'config.yaml')
+  .option('-c, --config <path>', 'Path to config file', DEFAULT_CONFIG_PATH)
   .action(async (opts) => {
     const configPath = resolve(opts.config);
     if (!existsSync(configPath)) {
@@ -97,7 +98,7 @@ service
 service
   .command('remove <name>')
   .description('Remove a service by name')
-  .option('-c, --config <path>', 'Path to config file', 'config.yaml')
+  .option('-c, --config <path>', 'Path to config file', DEFAULT_CONFIG_PATH)
   .action(async (name, opts) => {
     const configPath = resolve(opts.config);
     if (!existsSync(configPath)) {
@@ -140,7 +141,7 @@ const channel = program
 channel
   .command('list')
   .description('List all configured channels')
-  .option('-c, --config <path>', 'Path to config file', 'config.yaml')
+  .option('-c, --config <path>', 'Path to config file', DEFAULT_CONFIG_PATH)
   .action(async (opts) => {
     const configPath = resolve(opts.config);
     if (!existsSync(configPath)) {
@@ -177,13 +178,13 @@ channel
 channel
   .command('add')
   .description('Add a new channel interactively')
-  .option('-c, --config <path>', 'Path to config file', 'config.yaml')
+  .option('-c, --config <path>', 'Path to config file', DEFAULT_CONFIG_PATH)
   .action((opts) => channelAddWizard(opts));
 
 channel
   .command('remove <name>')
   .description('Remove a channel by name')
-  .option('-c, --config <path>', 'Path to config file', 'config.yaml')
+  .option('-c, --config <path>', 'Path to config file', DEFAULT_CONFIG_PATH)
   .action(async (name, opts) => {
     const configPath = resolve(opts.config);
     if (!existsSync(configPath)) {
@@ -236,13 +237,13 @@ const provision = program
 provision
   .command('whatsapp')
   .description('Buy a number and register it with WhatsApp')
-  .option('-c, --config <path>', 'Path to config file', 'config.yaml')
+  .option('-c, --config <path>', 'Path to config file', DEFAULT_CONFIG_PATH)
   .action((opts) => provisionWhatsAppWizard(opts));
 
 program
   .command('send <channel> <number> <message>')
   .description('Send a WhatsApp message to a phone number')
-  .option('-c, --config <path>', 'Path to config file', 'config.yaml')
+  .option('-c, --config <path>', 'Path to config file', DEFAULT_CONFIG_PATH)
   .option('-p, --port <port>', 'API server port', '4000')
   .action(sendCommand);
 

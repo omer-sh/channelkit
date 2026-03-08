@@ -110,7 +110,8 @@ export async function provisionWhatsAppWizard(opts: { config: string }) {
     const { join } = await import('path');
     const { mkdirSync, existsSync: dirExists } = await import('fs');
 
-    const authDir = join('.', 'auth', `whatsapp-provisioned`);
+    const { DEFAULT_AUTH_DIR } = await import('../../paths');
+    const authDir = join(DEFAULT_AUTH_DIR, `whatsapp-provisioned`);
     if (!dirExists(authDir)) mkdirSync(authDir, { recursive: true });
 
     const { state, saveCreds } = await useMultiFileAuthState(authDir);

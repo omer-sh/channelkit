@@ -34,24 +34,30 @@ Your app receives every message in a **unified JSON format**, regardless of sour
 
 ```bash
 npm install -g @dirbalak/channelkit
-channelkit init
+channelkit
 ```
 
-The interactive wizard will guide you through setup — pick a channel, enter credentials, set a webhook URL, and you're done. When setup is complete, the dashboard opens automatically in your browser.
+On first run, ChannelKit will ask how you'd like to set up:
+
+- **Dashboard** — creates a minimal config, starts the server, and opens the dashboard in your browser. You'll get an API secret to log in and configure everything from the UI.
+- **CLI wizard** — step-by-step terminal setup: pick a channel, enter credentials, set a webhook URL, and start.
+
+All configuration is stored in `~/.channelkit/` (config, auth sessions, logs).
 
 ### Running
 
 ```bash
 channelkit                         # start (opens dashboard automatically)
-channelkit start -c my.yaml        # use a custom config file
+channelkit start -c /path/to.yaml  # use a custom config file
 channelkit start --tunnel           # start with a public URL (Cloudflare tunnel)
 ```
 
 ## CLI Commands
 
 ```bash
+channelkit                         # start (auto-runs init on first run)
 channelkit init                    # interactive setup wizard
-channelkit start [-c config.yaml]  # start the gateway
+channelkit start [-c path]         # start the gateway
 
 channelkit channel add             # add a new channel interactively
 channelkit channel list            # list configured channels
@@ -301,7 +307,7 @@ channels:
 
 ### 6. Authorize
 
-When you start ChannelKit, it will automatically open your browser for OAuth authorization. Sign in with the Gmail account you added as a test user, grant access, and the token is saved locally in `auth/gmail-<channel-name>.json`.
+When you start ChannelKit, it will automatically open your browser for OAuth authorization. Sign in with the Gmail account you added as a test user, grant access, and the token is saved locally in `~/.channelkit/auth/gmail-<channel-name>.json`.
 
 ```bash
 channelkit start
@@ -311,6 +317,8 @@ channelkit start
 The refresh token is saved automatically. You won't need to re-authorize unless you revoke access or delete the token file.
 
 ## Config
+
+Default location: `~/.channelkit/config.yaml`
 
 ```yaml
 channels:
@@ -389,7 +397,7 @@ ChannelKit includes a built-in web dashboard (enabled by default) that shows:
 - Search and filter by channel
 - Stats: total messages, messages by channel, average latency
 
-All logs are stored in SQLite (`data/logs.db`) with automatic 30-day retention.
+All logs are stored in SQLite (`~/.channelkit/data/logs.db`) with automatic 30-day retention.
 
 ## MCP Server
 
@@ -511,13 +519,13 @@ ChannelKit is designed to run on a dedicated server. Follow these guidelines to 
 
 ### Required for production
 
-- **Set `api_secret`** in `config.yaml` — this protects all dashboard and API endpoints with Bearer token authentication. Without it, anyone with network access can control your instance.
+- **Set `api_secret`** in your config — this protects all dashboard and API endpoints with Bearer token authentication. It is auto-generated on first run. Without it, anyone with network access can control your instance.
 - **Run behind a reverse proxy** (nginx, Caddy, Traefik) with TLS termination. ChannelKit itself serves HTTP; the proxy handles HTTPS.
 - **Use firewall rules** to restrict port 4000 to localhost if using a reverse proxy, or to trusted IPs only.
 
 ### Credentials
 
-- **Never commit `config.yaml`** to version control (it's in `.gitignore` by default). If you previously committed it, rotate all credentials immediately.
+- **Never commit your config** to version control. Config is stored in `~/.channelkit/` by default, outside your project directory.
 - **Set a strong MCP secret** in Settings if you expose the MCP server externally.
 - **Webhook signature verification** is enabled automatically for Twilio and Resend channels when `auth_token` / `webhook_secret` are configured.
 

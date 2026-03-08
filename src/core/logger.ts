@@ -3,6 +3,7 @@ import { mkdirSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { EventEmitter } from 'events';
 import { randomUUID } from 'crypto';
+import { DEFAULT_DATA_DIR } from '../paths';
 
 export interface LogEntry {
   id: string;
@@ -29,7 +30,7 @@ const RETENTION_DAYS = 30;
 export class Logger extends EventEmitter {
   private db: Database.Database;
 
-  constructor(dataDir: string = './data') {
+  constructor(dataDir: string = DEFAULT_DATA_DIR) {
     super();
     const dbPath = join(dataDir, 'logs.db');
     const dir = dirname(dbPath);
