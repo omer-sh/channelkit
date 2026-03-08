@@ -589,11 +589,12 @@ To keep ChannelKit running after a system restart, set it up as a system service
 First, find the paths you'll need:
 
 ```bash
-which channelkit    # e.g. /Users/you/.nvm/versions/node/v22.0.0/bin/channelkit
-which node          # e.g. /Users/you/.nvm/versions/node/v22.0.0/bin/node
+which channelkit         # e.g. /Users/you/.nvm/versions/node/v22.0.0/bin/channelkit
+which node               # e.g. /Users/you/.nvm/versions/node/v22.0.0/bin/node
+dirname $(which node)    # e.g. /Users/you/.nvm/versions/node/v22.0.0/bin
 ```
 
-Then create a plist file at `~/Library/LaunchAgents/com.channelkit.plist`, replacing both paths below:
+Then create a plist file at `~/Library/LaunchAgents/com.channelkit.plist`, replacing all three paths below:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -602,6 +603,11 @@ Then create a plist file at `~/Library/LaunchAgents/com.channelkit.plist`, repla
 <dict>
     <key>Label</key>
     <string>com.channelkit</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>REPLACE_WITH_OUTPUT_OF_DIRNAME_WHICH_NODE:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
     <key>ProgramArguments</key>
     <array>
         <string>REPLACE_WITH_OUTPUT_OF_WHICH_NODE</string>
@@ -620,7 +626,7 @@ Then create a plist file at `~/Library/LaunchAgents/com.channelkit.plist`, repla
 </plist>
 ```
 
-This calls `node` directly with the `channelkit` script as its argument, which avoids the `env: node: No such file or directory` error that occurs because launchd doesn't load your shell profile (where `nvm`/`fnm`/Homebrew set up `PATH`).
+> **Why these settings?** launchd doesn't load your shell profile (where `nvm`/`fnm`/Homebrew set up `PATH`), so both `node` and `npm` would be missing. The `EnvironmentVariables` block sets `PATH` so child processes (like auto-update) can find `npm`, and `ProgramArguments` calls `node` directly to avoid the `env: node: No such file or directory` error.
 
 Load the service:
 
