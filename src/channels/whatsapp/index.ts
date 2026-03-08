@@ -1,18 +1,35 @@
-import makeWASocket, {
-  DisconnectReason,
-  useMultiFileAuthState,
-  fetchLatestBaileysVersion,
-  WASocket,
-  proto,
-  makeCacheableSignalKeyStore,
-  downloadMediaMessage,
-} from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import { join } from 'path';
 import { Channel } from '../base';
 import { WhatsAppChannelConfig } from '../../config/types';
 import { UnifiedMessage, WebhookResponse } from '../../core/types';
 import { DEFAULT_AUTH_DIR } from '../../paths';
+
+let baileys: typeof import('@whiskeysockets/baileys') | null = null;
+
+async function loadBaileys() {
+  if (!baileys) {
+    try {
+      baileys = await import('@whiskeysockets/baileys');
+    } catch {
+      throw new Error(
+        'WhatsApp support requires @whiskeysockets/baileys.\n' +
+        'Install it with: npm install @whiskeysockets/baileys\n\n' +
+        'Note: @whiskeysockets/baileys is licensed under GPL-3.0.'
+      );
+    }
+  }
+  return baileys;
+}
+
+export function isBaileysAvailable(): boolean {
+  try {
+    require.resolve('@whiskeysockets/baileys');
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export class WhatsAppChannel extends Channel {
   /**
@@ -21,6 +38,7 @@ export class WhatsAppChannel extends Channel {
    * Auth state is persisted to authDir for later use by connect().
    */
   static async pair(authDir: string, onQR?: (qr: string) => void): Promise<void> {
+    const { useMultiFileAuthState, fetchLatestBaileysVersion, makeCacheableSignalKeyStore, DisconnectReason, default: makeWASocket } = await loadBaileys();
     const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
     // Check if already paired (has registered creds)
@@ -58,7 +76,7 @@ export class WhatsAppChannel extends Channel {
         reject(new Error('QR pairing timed out after 60s'));
       }, 60000);
 
-      sock.ev.on('connection.update', (update) => {
+      sock.ev.on('connection.update', (update: any) => {
         const { connection, lastDisconnect, qr } = update;
 
         if (qr) {
@@ -96,7 +114,7 @@ export class WhatsAppChannel extends Channel {
     });
   }
 
-  private sock: WASocket | null = null;
+  private sock: any = null;
   private authDir: string;
   private reconnectAttempts = 0;
   private static readonly MAX_RECONNECT_ATTEMPTS = 10;
@@ -117,7 +135,7 @@ export class WhatsAppChannel extends Channel {
     setTimeout(() => this.connect(), delay);
   }
 
-  getSocket(): WASocket | null {
+  getSocket(): any {
     return this.sock;
   }
 
@@ -133,6 +151,7 @@ export class WhatsAppChannel extends Channel {
   }
 
   async connect(): Promise<void> {
+    const { useMultiFileAuthState, fetchLatestBaileysVersion, makeCacheableSignalKeyStore, downloadMediaMessage, DisconnectReason, default: makeWASocket } = await loadBaileys();
     const { state, saveCreds } = await useMultiFileAuthState(this.authDir);
 
     const silentLogger = {
@@ -160,7 +179,7 @@ export class WhatsAppChannel extends Channel {
 
     this.sock.ev.on('creds.update', saveCreds);
 
-    this.sock.ev.on('connection.update', (update) => {
+    this.sock.ev.on('connection.update', (update: any) => {
       const { connection, lastDisconnect, qr } = update;
       
       if (qr) {
@@ -198,7 +217,7 @@ export class WhatsAppChannel extends Channel {
       }
     });
 
-    this.sock.ev.on('messages.upsert', async ({ messages }) => {
+    this.sock.ev.on('messages.upsert', async ({ messages }: { messages: any[] }) => {
       for (const msg of messages) {
         if (msg.key.fromMe) continue;
         // Resolve LID to regular JID
@@ -286,7 +305,7 @@ export class WhatsAppChannel extends Channel {
     }
   }
 
-  private toUnified(msg: proto.IWebMessageInfo, pushName?: string): UnifiedMessage | null {
+  private toUnified(msg: any, pushName?: string): UnifiedMessage | null {
     const key = msg.key!;
     const jid = key.remoteJid;
     if (!jid) return null;

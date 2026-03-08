@@ -14,7 +14,7 @@ Your app receives every message in a **unified JSON format**, regardless of sour
 
 ## Features
 
-- **WhatsApp** (Baileys) — QR code linking, magic codes + auto-created groups for multi-service
+- **WhatsApp** (Baileys, optional) — QR code linking, magic codes + auto-created groups for multi-service
 - **Telegram** (grammY) — bot token setup, slash commands for multi-service
 - **Email** — Gmail (OAuth2 + polling) and Resend (API + polling/webhook)
 - **Services model** — single or multiple services per channel, each with its own webhook
@@ -662,6 +662,46 @@ sudo systemctl status channelkit
 journalctl -u channelkit -f         # follow logs
 ```
 
+## WhatsApp Setup
+
+WhatsApp support requires the `@whiskeysockets/baileys` package, which is an **optional peer dependency** — it is not installed automatically with ChannelKit.
+
+> **License notice:** `@whiskeysockets/baileys` depends on `libsignal-node`, which is licensed under **GPL-3.0**. By installing it, you accept the GPL-3.0 terms for that dependency. The ChannelKit core remains MIT-licensed.
+
+### Install Baileys
+
+If ChannelKit is installed globally:
+
+```bash
+npm install -g @whiskeysockets/baileys
+```
+
+If running from a project directory:
+
+```bash
+npm install @whiskeysockets/baileys
+```
+
+Without this package, ChannelKit will skip any WhatsApp channels in your config and print a warning. All other channels (Telegram, Email, SMS, Voice, Endpoint) work without it.
+
+### Pair your device
+
+Start ChannelKit and scan the QR code with WhatsApp:
+
+```bash
+channelkit start
+```
+
+Open WhatsApp on your phone > Settings > Linked Devices > Link a Device, then scan the QR code shown in the terminal.
+
+### Provision a new number
+
+To buy a Twilio number and automatically pair it with WhatsApp:
+
+```bash
+channelkit channel provision
+```
+
 ## Development
 
 ```bash
@@ -723,4 +763,6 @@ This is common during development or when ChannelKit and your app run on the sam
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
+
+WhatsApp integration requires `@whiskeysockets/baileys` (optional peer dependency, GPL-3.0 via `libsignal-node`). Installing it is opt-in and subject to its own license terms.

@@ -556,7 +556,7 @@ function FetchNumbersPanel({ typeKey, fieldValues, channels, twilioDefaults, onS
 }
 
 export default function Channels({ loadConfig }) {
-  const { channels, services, twilioDefaults, tunnelActive, qrMessage, smsListenMessage } = useAppState();
+  const { channels, services, twilioDefaults, tunnelActive, qrMessage, smsListenMessage, baileysAvailable } = useAppState();
   const dispatch = useDispatch();
   const [step, setStep] = useState('pick');
   const [typeKey, setTypeKey] = useState('');
@@ -927,17 +927,39 @@ export default function Channels({ loadConfig }) {
                 { type: 'email-gmail', label: 'Email', sub: 'Gmail (OAuth2)' },
                 { type: 'email-resend', label: 'Email', sub: 'Resend' },
                 { type: 'endpoint', label: 'Endpoint', sub: 'HTTP Webhook' },
-              ].map(t => (
-                <div
-                  key={t.type}
-                  onClick={() => selectType(t.type)}
-                  className="flex flex-col items-center gap-2 p-4 bg-bg-light border-2 border-border rounded-xl cursor-pointer transition-all hover:border-primary hover:bg-highlight text-center"
-                >
-                  <div className="w-8 h-8 flex items-center justify-center">{channelTypeSvgs[t.type.split('-')[0]] || channelTypeSvgs[t.type]}</div>
-                  <div className="text-sm font-medium text-text">{t.label}</div>
-                  <div className="text-[11px] text-dim leading-tight">{t.sub}</div>
+              ].map(t => {
+                const disabled = t.type === 'whatsapp' && !baileysAvailable;
+                return (
+                  <div
+                    key={t.type}
+                    onClick={() => !disabled && selectType(t.type)}
+                    className={`flex flex-col items-center gap-2 p-4 border-2 rounded-xl text-center transition-all ${disabled ? 'bg-bg-light border-border opacity-50 cursor-not-allowed' : 'bg-bg-light border-border cursor-pointer hover:border-primary hover:bg-highlight'}`}
+                  >
+                    <div className="w-8 h-8 flex items-center justify-center">{channelTypeSvgs[t.type.split('-')[0]] || channelTypeSvgs[t.type]}</div>
+                    <div className="text-sm font-medium text-text">{t.label}</div>
+                    <div className="text-[11px] text-dim leading-tight">{disabled ? 'Not installed' : t.sub}</div>
+                  </div>
+                );
+              })}
+              {!baileysAvailable && (
+                <div className="col-span-full mt-2 p-3 bg-bg-light border border-border rounded-lg">
+                  <div className="text-xs text-dim mb-2">
+                    WhatsApp requires the <code className="px-1 py-0.5 rounded bg-surface text-text">@whiskeysockets/baileys</code> package, which is not currently installed.
+                  </div>
+                  <div className="text-xs text-dim mb-2">
+                    Run this in the directory you start ChannelKit from:
+                  </div>
+                  <div className="bg-surface border border-border rounded px-3 py-2 font-mono text-xs text-text select-all mb-2">
+                    npm install @whiskeysockets/baileys
+                  </div>
+                  <div className="text-xs text-dim mb-1">
+                    If ChannelKit is installed globally, use <code className="px-1 py-0.5 rounded bg-surface text-text">npm install -g @whiskeysockets/baileys</code> instead.
+                  </div>
+                  <div className="text-xs text-dim">
+                    Then restart ChannelKit. Note: this package is licensed under GPL-3.0.
+                  </div>
                 </div>
-              ))}
+              )}
             </div>
           </div>
         ) : (

@@ -1,7 +1,7 @@
 import { Express } from 'express';
 import { ServerContext } from '../types';
 import { loadConfig, saveConfig } from '../../config/parser';
-import { WhatsAppChannel } from '../../channels/whatsapp';
+import { WhatsAppChannel, isBaileysAvailable } from '../../channels/whatsapp';
 import { DEFAULT_AUTH_DIR } from '../../paths';
 
 /** Keys in channel configs that contain secrets and should be masked in API responses. */
@@ -40,7 +40,7 @@ export function registerConfigRoutes(app: Express, ctx: ServerContext): void {
     }
     try {
       const config = loadConfig(ctx.configPath, { validate: false });
-      res.json({ channels: maskChannelSecrets(config.channels), services: config.services || {} });
+      res.json({ channels: maskChannelSecrets(config.channels), services: config.services || {}, baileysAvailable: isBaileysAvailable() });
     } catch (err: any) {
       res.status(500).json({ error: 'Failed to load config' });
     }

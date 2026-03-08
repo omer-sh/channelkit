@@ -105,8 +105,17 @@ export async function provisionWhatsAppWizard(opts: { config: string }) {
     console.log(c('bright', '\n  🔗 Step 3: Connect ChannelKit\n'));
     console.log(c('dim', '  Now we\'ll connect ChannelKit as a linked device...\n'));
 
-    const { useMultiFileAuthState, makeCacheableSignalKeyStore } = await import('@whiskeysockets/baileys');
-    const makeWASocket = (await import('@whiskeysockets/baileys')).default;
+    let baileysModule;
+    try {
+      baileysModule = await import('@whiskeysockets/baileys');
+    } catch {
+      console.log(c('yellow', '\n  ❌ @whiskeysockets/baileys is not installed.'));
+      console.log(c('white', '  Install it with: npm install @whiskeysockets/baileys\n'));
+      rl.close();
+      return;
+    }
+    const { useMultiFileAuthState, makeCacheableSignalKeyStore } = baileysModule;
+    const makeWASocket = baileysModule.default;
     const { join } = await import('path');
     const { mkdirSync, existsSync: dirExists } = await import('fs');
 
@@ -134,7 +143,7 @@ export async function provisionWhatsAppWizard(opts: { config: string }) {
         rejectConn(new Error('Connection timeout'));
       }, 120000);
 
-      sock.ev.on('connection.update', async (update) => {
+      sock.ev.on('connection.update', async (update: any) => {
         const { connection, lastDisconnect, qr } = update;
 
         if ((connection === 'connecting' || qr) && !pairingRequested) {

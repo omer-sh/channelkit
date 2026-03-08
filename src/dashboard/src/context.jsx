@@ -15,6 +15,7 @@ const initialState = {
   mcpHasSecret: false,
   tunnelExposeDashboard: false,
   hasSmsWebhookChannels: false,
+  baileysAvailable: true,
   twilioDefaults: { sid: '', tok: '' },
   stats: { total: 0, errorCount: 0, avgLatency: 0, uptime: 0 },
   wsConnected: false,
@@ -44,6 +45,7 @@ function reducer(state, action) {
         ...state,
         channels: action.payload.channels || state.channels,
         services: action.payload.services || state.services,
+        baileysAvailable: action.payload.baileysAvailable ?? state.baileysAvailable,
         hasSmsWebhookChannels: Object.values(action.payload.channels || {}).some(
           ch => ch.type === 'sms' && !ch.poll_interval
         ),

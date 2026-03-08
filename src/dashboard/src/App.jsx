@@ -134,7 +134,7 @@ export default function App() {
       .then(r => r.json())
       .then(data => {
         if (data.channels) {
-          dispatch({ type: 'SET_CONFIG', payload: { channels: data.channels, services: data.services } });
+          dispatch({ type: 'SET_CONFIG', payload: { channels: data.channels, services: data.services, baileysAvailable: data.baileysAvailable } });
         }
       })
       .catch(() => {});
@@ -168,7 +168,7 @@ export default function App() {
     apiFetch(API + '/api/config')
       .then(r => r.json())
       .then(data => {
-        dispatch({ type: 'SET_CONFIG', payload: { channels: data.channels, services: data.services } });
+        dispatch({ type: 'SET_CONFIG', payload: { channels: data.channels, services: data.services, baileysAvailable: data.baileysAvailable } });
       })
       .catch(() => {});
   }, [state.configChanged, dispatch]);
@@ -177,7 +177,7 @@ export default function App() {
     return apiFetch(API + '/api/config')
       .then(r => r.json())
       .then(data => {
-        dispatch({ type: 'SET_CONFIG', payload: { channels: data.channels || {}, services: data.services || {} } });
+        dispatch({ type: 'SET_CONFIG', payload: { channels: data.channels || {}, services: data.services || {}, baileysAvailable: data.baileysAvailable } });
       })
       .catch(() => {});
   }, [dispatch]);

@@ -9,7 +9,8 @@
   "files": [
     "dist/",
     "config.example.yaml",
-    "echo-server.js"
+    "echo-server.js",
+    "LICENSE"
   ],
   "publishConfig": {
     "access": "restricted"
@@ -62,6 +63,11 @@
     "typescript": "^5.9.3",
     "ws": "^8.19.0",
     "yaml": "^2.8.2"
+  },
+  "peerDependenciesMeta": {
+    "@whiskeysockets/baileys": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.1",

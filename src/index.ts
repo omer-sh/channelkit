@@ -3,7 +3,7 @@ import { AppConfig, TunnelConfig } from './config/types';
 import { Router } from './core/router';
 import { ApiServer } from './api/server';
 import { Channel } from './channels/base';
-import { WhatsAppChannel } from './channels/whatsapp';
+import { WhatsAppChannel, isBaileysAvailable } from './channels/whatsapp';
 import { TelegramChannel } from './channels/telegram';
 import { GmailChannel, ResendChannel } from './channels/email';
 import { TwilioSMSChannel } from './channels/sms';
@@ -89,6 +89,11 @@ export class ChannelKit {
       let channel: Channel;
       switch (channelConfig.type) {
         case 'whatsapp':
+          if (!isBaileysAvailable()) {
+            console.warn(`[channelkit] Skipping WhatsApp channel "${name}" — @whiskeysockets/baileys is not installed.`);
+            console.warn(`[channelkit] Install it with: npm install -g @whiskeysockets/baileys (global) or npm install @whiskeysockets/baileys (local)`);
+            continue;
+          }
           channel = new WhatsAppChannel(name, channelConfig as any);
           whatsappChannel = channel as WhatsAppChannel;
           break;
