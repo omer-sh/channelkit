@@ -586,7 +586,14 @@ To keep ChannelKit running after a system restart, set it up as a system service
 
 ### macOS (launchd)
 
-Create a plist file at `~/Library/LaunchAgents/com.channelkit.plist`:
+First, find the paths you'll need:
+
+```bash
+which channelkit    # e.g. /Users/you/.nvm/versions/node/v22.0.0/bin/channelkit
+which node          # e.g. /Users/you/.nvm/versions/node/v22.0.0/bin/node
+```
+
+Then create a plist file at `~/Library/LaunchAgents/com.channelkit.plist`, replacing both paths below:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -597,7 +604,8 @@ Create a plist file at `~/Library/LaunchAgents/com.channelkit.plist`:
     <string>com.channelkit</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/local/bin/channelkit</string>
+        <string>REPLACE_WITH_OUTPUT_OF_WHICH_NODE</string>
+        <string>REPLACE_WITH_OUTPUT_OF_WHICH_CHANNELKIT</string>
         <string>start</string>
     </array>
     <key>RunAtLoad</key>
@@ -612,7 +620,7 @@ Create a plist file at `~/Library/LaunchAgents/com.channelkit.plist`:
 </plist>
 ```
 
-> **Note:** If you installed Node via `nvm` or `fnm`, the `channelkit` binary path may differ. Run `which channelkit` to find the correct path and update `ProgramArguments` accordingly.
+This calls `node` directly with the `channelkit` script as its argument, which avoids the `env: node: No such file or directory` error that occurs because launchd doesn't load your shell profile (where `nvm`/`fnm`/Homebrew set up `PATH`).
 
 Load the service:
 
@@ -628,7 +636,7 @@ launchctl unload ~/Library/LaunchAgents/com.channelkit.plist
 
 ### Linux (systemd)
 
-Create a service file at `/etc/systemd/system/channelkit.service`:
+Find the binary path with `which channelkit`, then create a service file at `/etc/systemd/system/channelkit.service`:
 
 ```ini
 [Unit]
@@ -638,7 +646,7 @@ After=network.target
 [Service]
 Type=simple
 User=your-username
-ExecStart=/usr/local/bin/channelkit start
+ExecStart=REPLACE_WITH_OUTPUT_OF_WHICH_CHANNELKIT start
 Restart=always
 RestartSec=10
 Environment=NODE_ENV=production
