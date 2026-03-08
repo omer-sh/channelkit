@@ -24,7 +24,7 @@ export function registerSettingsRoutes(app: Express, ctx: ServerContext): void {
       if (mcpSecret) {
         masked['mcp_secret'] = mcpSecret.length > 4 ? '•'.repeat(mcpSecret.length - 4) + mcpSecret.slice(-4) : '••••';
       }
-      res.json({ settings: masked, port: config.apiPort || 4000 });
+      res.json({ settings: masked, port: config.apiPort || 4000, autoUpdate: config.auto_update?.enabled !== false });
     } catch (err: any) {
       console.error('[api]', err); res.status(500).json({ error: 'Internal server error' });
     }
@@ -83,6 +83,11 @@ export function registerSettingsRoutes(app: Express, ctx: ServerContext): void {
         if (portVal >= 1 && portVal <= 65535) {
           config.apiPort = portVal;
         }
+      }
+      // Handle auto_update → config.auto_update.enabled
+      if ('auto_update' in req.body) {
+        if (!config.auto_update) config.auto_update = {};
+        config.auto_update.enabled = !!req.body['auto_update'];
       }
       // Handle mcp_secret → config.mcp.secret
       if ('mcp_secret' in req.body) {

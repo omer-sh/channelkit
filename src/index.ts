@@ -380,9 +380,9 @@ export class ChannelKit {
       return await this.updater!.performUpdate();
     };
 
-    // Start auto-update if configured
-    if (this.config.auto_update?.enabled) {
-      const interval = this.config.auto_update.interval || 30;
+    // Start auto-update (enabled by default)
+    if (this.config.auto_update?.enabled !== false) {
+      const interval = this.config.auto_update?.interval || 30;
       this.updater.startAutoUpdate(interval);
     }
 

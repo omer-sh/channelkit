@@ -50,6 +50,8 @@ export default function Settings() {
   const [statusColor, setStatusColor] = useState('');
   const [port, setPort] = useState('');
   const [origPort, setOrigPort] = useState('');
+  const [autoUpdate, setAutoUpdate] = useState(true);
+  const [origAutoUpdate, setOrigAutoUpdate] = useState(true);
 
   useEffect(() => {
     loadSettings();
@@ -70,6 +72,9 @@ export default function Settings() {
       const p = String(data.port || 4000);
       setPort(p);
       setOrigPort(p);
+      const au = data.autoUpdate !== false;
+      setAutoUpdate(au);
+      setOrigAutoUpdate(au);
     } catch (e) {
       console.error('Failed to load settings', e);
     }
@@ -83,6 +88,7 @@ export default function Settings() {
     }
     if (allowLocal !== origAllowLocal) body.allow_local_webhooks = allowLocal;
     if (port !== origPort) body.port = parseInt(port, 10) || 4000;
+    if (autoUpdate !== origAutoUpdate) body.auto_update = autoUpdate;
     if (Object.keys(body).length === 0) {
       setStatus('No changes to save');
       setStatusColor('text-dim');
@@ -128,18 +134,32 @@ export default function Settings() {
       <div className="bg-surface border border-border rounded-xl p-6 shadow-sm space-y-6">
         <div>
           <h3 className="text-sm font-semibold text-text mb-1">Server</h3>
-          <p className="text-xs text-dim mb-4">Port the API server and dashboard listen on. Requires restart to take effect.</p>
-          <div>
-            <label className="text-xs font-medium block mb-1 text-text">Port</label>
-            <input
-              type="number"
-              min="1"
-              max="65535"
-              placeholder="4000"
-              value={port}
-              onChange={e => setPort(e.target.value)}
-              className="w-32 py-2 px-3 border border-border rounded-lg text-sm bg-bg-light text-text focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-            />
+          <p className="text-xs text-dim mb-4">General server configuration.</p>
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-medium block mb-1 text-text">Port <span className="text-dim font-normal">(requires restart)</span></label>
+              <input
+                type="number"
+                min="1"
+                max="65535"
+                placeholder="4000"
+                value={port}
+                onChange={e => setPort(e.target.value)}
+                className="w-32 py-2 px-3 border border-border rounded-lg text-sm bg-bg-light text-text focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoUpdate}
+                onChange={e => setAutoUpdate(e.target.checked)}
+                className="w-4 h-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
+              />
+              <div>
+                <span className="text-xs font-medium text-text">Auto-update</span>
+                <p className="text-[11px] text-dim mt-0.5">Automatically check for and install new versions.</p>
+              </div>
+            </label>
           </div>
         </div>
 
