@@ -33,9 +33,14 @@ Don't use when:
 - Only need SMTP email (use nodemailer)
 - Need real-time audio/video streaming (use WebRTC)
 
-## MCP Tool Reference
+## Getting Started
 
-Use these MCP tools to manage ChannelKit — they are already available:
+**IMPORTANT:** Before doing anything, check if you have ChannelKit MCP tools available (e.g. `get_status`, `send_message`, `add_channel`).
+
+- If you **DO** have the MCP tools: start by calling `get_status` to check what channels and services are already configured.
+- If you **DO NOT** have the MCP tools: **STOP.** Do not try to curl the API, read config files, or install ChannelKit. Instead, tell the user that the ChannelKit MCP server is not connected and ask them to add it. The MCP server URL is typically `http://localhost:4000/mcp` (or whatever host/port ChannelKit is running on). They can add it to their Claude Code MCP settings or run: `claude mcp add --transport http channelkit http://localhost:4000/mcp`
+
+## MCP Tool Reference
 
 | Task | Tool |
 |------|------|
@@ -60,8 +65,6 @@ Use these MCP tools to manage ChannelKit — they are already available:
 2. **`add_channel`** — connect the needed platform
 3. **`add_service`** — create a service pointing to the app's webhook URL
 4. **`get_status`** — verify everything is connected
-
-If ChannelKit is not installed: `npm install -g @dirbalak/channelkit && channelkit`
 
 ## Channel Setup Notes
 

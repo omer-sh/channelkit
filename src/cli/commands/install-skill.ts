@@ -27,16 +27,16 @@ export function installSkillCommand(opts: { print?: boolean }) {
     console.log(c('bright', '  If ChannelKit runs on a different machine than Claude Code,'));
     console.log(c('bright', '  use --print to output the skill and copy it to your dev machine:\n'));
     console.log(c('cyan', '  channelkit install-skill --print > channelkit-skill.md'));
-    console.log(c('dim', '  Then copy channelkit-skill.md to ~/.claude/skills/channelkit.md on your dev machine.\n'));
+    console.log(c('dim', '  Then copy channelkit-skill.md to ~/.claude/skills/channelkit/SKILL.md on your dev machine.\n'));
     process.exit(1);
   }
 
-  const claudeSkillsDir = join(claudeDir, 'skills');
-  const skillDest = join(claudeSkillsDir, 'channelkit.md');
+  const skillDir = join(claudeDir, 'skills', 'channelkit');
+  const skillDest = join(skillDir, 'SKILL.md');
 
-  mkdirSync(claudeSkillsDir, { recursive: true });
+  mkdirSync(skillDir, { recursive: true });
   copyFileSync(skillSource, skillDest);
 
-  console.log(c('green', '\n  ✅ ChannelKit skill installed to ~/.claude/skills/channelkit.md'));
+  console.log(c('green', '\n  ✅ ChannelKit skill installed to ~/.claude/skills/channelkit/SKILL.md'));
   console.log(c('dim', '  Claude Code will now use it when helping with messaging integrations.\n'));
 }
