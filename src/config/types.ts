@@ -166,7 +166,7 @@ export interface SettingsConfig {
 
 export interface McpConfig {
   enabled?: boolean;
-  port?: number;       // HTTP transport port (default 4100)
+  port?: number;       // HTTP transport port (standalone mode only)
   stdio?: boolean;     // Enable stdio transport
   expose?: boolean;    // allow MCP access via tunnel (default: false)
   secret?: string;     // Bearer token required for MCP access

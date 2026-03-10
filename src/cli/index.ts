@@ -13,6 +13,7 @@ import { demoCommand } from './commands/demo';
 import { serviceAddWizard } from './wizards/service';
 import { channelAddWizard } from './wizards/channel';
 import { provisionWhatsAppWizard } from './wizards/provision';
+import { installSkillCommand } from './commands/install-skill';
 
 const program = new Command();
 
@@ -252,6 +253,12 @@ program
   .description('Run the built-in echo/demo server')
   .option('-p, --port <port>', 'Port to listen on', '3000')
   .action(demoCommand);
+
+program
+  .command('install-skill')
+  .description('Install the ChannelKit skill for Claude Code')
+  .option('--print', 'Output the skill file to stdout instead of installing')
+  .action(installSkillCommand);
 
 // Default to "start" when no command is given
 const args = process.argv.slice(2);

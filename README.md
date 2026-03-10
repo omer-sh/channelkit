@@ -142,6 +142,8 @@ channelkit channel remove <name>   # remove a channel
 channelkit service add             # add a new service interactively
 channelkit service list            # list configured services
 channelkit service remove <name>   # remove a service
+
+channelkit install-skill           # install Claude Code skill
 ```
 
 ## Services & Multi-Service
@@ -484,7 +486,6 @@ ChannelKit includes a [Model Context Protocol](https://modelcontextprotocol.io/)
 ```yaml
 mcp:
   enabled: true
-  port: 4100 # HTTP transport port
   stdio: true # enable stdio transport (for Claude Desktop)
   secret: "my-token" # optional Bearer token for auth
 ```
@@ -508,8 +509,8 @@ mcp:
 
 ### Transports
 
-- **Streamable HTTP** — `http://localhost:4100/mcp` (modern clients)
-- **SSE** — `http://localhost:4100/sse` + `/messages` (legacy clients)
+- **Streamable HTTP** — `http://localhost:4000/mcp` (modern clients)
+- **SSE** — `http://localhost:4000/sse` + `/messages` (legacy clients)
 - **Stdio** — for Claude Desktop and local integrations
 
 ### Connecting from Claude Desktop
@@ -527,7 +528,25 @@ Add to your Claude Desktop config (`claude_desktop_config.json`):
 }
 ```
 
-Or connect to a running instance via HTTP at `http://localhost:4100/mcp`.
+Or connect to a running instance via HTTP at `http://localhost:4000/mcp`.
+
+## Claude Code Skill
+
+ChannelKit ships with a skill file that teaches Claude Code how to set up channels, create services, and integrate messaging into your app using the MCP tools.
+
+```bash
+channelkit install-skill          # copies skill to ~/.claude/skills/
+```
+
+If ChannelKit runs on a different machine (e.g., a server) than Claude Code (your dev laptop), use `--print` to output the skill and transfer it:
+
+```bash
+# On the server
+channelkit install-skill --print > channelkit-skill.md
+
+# Copy to your dev machine
+scp server:channelkit-skill.md ~/.claude/skills/channelkit.md
+```
 
 ## Webhook API
 

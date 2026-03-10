@@ -10,7 +10,7 @@ import { McpContext, registerTools } from './tools';
 
 export interface McpServerConfig {
   enabled?: boolean;
-  port?: number;       // HTTP transport port, default 4100
+  port?: number;       // HTTP transport port (standalone mode only)
   stdio?: boolean;     // Enable stdio transport (for Claude Desktop etc.)
 }
 
