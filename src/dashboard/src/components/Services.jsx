@@ -117,13 +117,14 @@ function AudioSettingsRow({ name, svc, settings, onClose, loadConfig }) {
   const tts = svc.tts || {};
   const [sttProvider, setSttProvider] = useState(stt.provider || '');
   const [sttLang, setSttLang] = useState(stt.language || '');
+  const [forwardAudio, setForwardAudio] = useState(!!stt.forward_audio);
   const [ttsProvider, setTtsProvider] = useState(tts.provider || '');
   const [ttsLang, setTtsLang] = useState(tts.language || '');
   const [ttsVoice, setTtsVoice] = useState(tts.voice || '');
   const [status, setStatus] = useState('');
 
   async function save() {
-    const sttVal = sttProvider ? { provider: sttProvider, ...(sttLang && { language: sttLang }) } : null;
+    const sttVal = sttProvider ? { provider: sttProvider, ...(sttLang && { language: sttLang }), ...(forwardAudio && { forward_audio: true }) } : null;
     const ttsVal = ttsProvider ? { provider: ttsProvider, ...(ttsLang && { language: ttsLang }), ...(ttsVoice && { voice: ttsVoice }) } : null;
     try {
       const res = await apiFetch(API + '/api/config/services/' + encodeURIComponent(name), {
@@ -147,6 +148,7 @@ function AudioSettingsRow({ name, svc, settings, onClose, loadConfig }) {
               <div className="text-xs font-semibold text-dim">Speech-to-Text (incoming audio)</div>
               <ProviderSelect map={sttProviderMap} value={sttProvider} onChange={setSttProvider} settings={settings} />
               {sttProvider && <input value={sttLang} onChange={e => setSttLang(e.target.value)} placeholder="Language (e.g. en-US, he-IL)" className={inputCls} />}
+              {sttProvider && <label className="flex items-center gap-2 text-xs text-dim cursor-pointer"><input type="checkbox" checked={forwardAudio} onChange={e => setForwardAudio(e.target.checked)} />Forward original audio to webhook</label>}
             </div>
             <div className="flex-1 min-w-[220px] space-y-2">
               <div className="text-xs font-semibold text-dim">Text-to-Speech (outgoing audio)</div>

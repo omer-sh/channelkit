@@ -82,6 +82,10 @@ export async function processInbound(message: UnifiedMessage, serviceConfig: Ser
         } else {
           console.log(`[stt] Empty transcription for message ${message.id}`);
         }
+        // Clear media buffer after transcription unless forward_audio is enabled
+        if (!serviceConfig.stt.forward_audio) {
+          delete message.media;
+        }
       } catch (err) {
         console.error(`[stt] Transcription failed for message ${message.id}:`, err);
       }
@@ -118,6 +122,23 @@ export interface OutboundResult {
   ttsError?: string;
 }
 
+/** Strip messaging formatting characters so TTS reads clean text. */
+function stripFormatting(text: string): string {
+  return text
+    .replace(/\*([^*]+)\*/g, '$1')       // *bold*
+    .replace(/_([^_]+)_/g, '$1')         // _italic_
+    .replace(/~([^~]+)~/g, '$1')         // ~strikethrough~
+    .replace(/```[\s\S]*?```/g, '')      // ```code blocks```
+    .replace(/`([^`]+)`/g, '$1')         // `inline code`
+    .replace(/^>\s?/gm, '')              // > blockquote
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // [link text](url)
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1') // ![alt](image url)
+    .replace(/^#{1,6}\s+/gm, '')         // # headings
+    .replace(/^[-*+]\s+/gm, '')          // bullet lists
+    .replace(/^\d+\.\s+/gm, '')          // numbered lists
+    .trim();
+}
+
 /**
  * Process outbound response: if TTS is configured on the service, synthesize audio.
  * Returns the response (with media buffer on success) and any TTS error.
@@ -130,8 +151,9 @@ export async function processOutbound(response: WebhookResponse, serviceConfig: 
   if (!tts) return { response };
 
   try {
-    console.log(`[tts] Synthesizing: "${response.text.substring(0, 80)}${response.text.length > 80 ? '...' : ''}"`);
-    const { buffer, mimetype } = await tts.synthesize(response.text, serviceConfig.tts.voice);
+    const ttsText = stripFormatting(response.text);
+    console.log(`[tts] Synthesizing: "${ttsText.substring(0, 80)}${ttsText.length > 80 ? '...' : ''}"`);
+    const { buffer, mimetype } = await tts.synthesize(ttsText, serviceConfig.tts.voice);
     console.log(`[tts] Synthesized ${buffer.length} bytes (${mimetype})`);
 
     return {

@@ -551,7 +551,19 @@ Or connect to a running instance via HTTP at `http://localhost:4000/mcp`.
 ChannelKit ships with a skill file that teaches Claude Code how to set up channels, create services, and integrate messaging into your app using the MCP tools.
 
 ```bash
-channelkit install-skill          # copies skill to ~/.claude/skills/
+channelkit install-skill          # copies skill to ~/.claude/skills/channelkit/SKILL.md
+```
+
+The installer will also print a short snippet to add to your `~/.claude/CLAUDE.md`. This ensures Claude Code always knows about ChannelKit's built-in features (TTS/STT, MCP tools, etc.) without relying on the skill trigger to fire. Add it to your `~/.claude/CLAUDE.md` (create the file if it doesn't exist):
+
+```markdown
+## ChannelKit
+
+When working with WhatsApp, SMS, Voice, Telegram, or Email messaging:
+- **ChannelKit has built-in TTS/STT.** Never install TTS or STT packages in the app. Configure TTS on the ChannelKit service — the app just returns `{ "text": "..." }` and ChannelKit converts it to audio automatically.
+- **Use ChannelKit MCP tools** (get_status, send_message, add_channel, etc.) — not curl. If MCP tools are not available, ask the user to connect: `claude mcp add --transport http channelkit http://localhost:4000/mcp`
+- **Do not install ChannelKit** unless the user explicitly asks — it's likely already running.
+- Run `/channelkit` to load the full ChannelKit skill with detailed integration docs, MCP tool reference, and setup patterns.
 ```
 
 If ChannelKit runs on a different machine (e.g., a server) than Claude Code (your dev laptop), use `--print` to output the skill and transfer it:
@@ -561,7 +573,7 @@ If ChannelKit runs on a different machine (e.g., a server) than Claude Code (you
 channelkit install-skill --print > channelkit-skill.md
 
 # Copy to your dev machine
-scp server:channelkit-skill.md ~/.claude/skills/channelkit.md
+scp server:channelkit-skill.md ~/.claude/skills/channelkit/SKILL.md
 ```
 
 ## Webhook API

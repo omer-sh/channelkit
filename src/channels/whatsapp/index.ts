@@ -32,6 +32,7 @@ export function isBaileysAvailable(): boolean {
 }
 
 export class WhatsAppChannel extends Channel {
+  private processedIds: Set<string> = new Set();
   /**
    * Pair a new WhatsApp device by showing a QR code.
    * Creates a temporary Baileys connection, waits for successful pairing, then disconnects.
@@ -226,6 +227,15 @@ export class WhatsAppChannel extends Channel {
     this.sock.ev.on('messages.upsert', async ({ messages }: { messages: any[] }) => {
       for (const msg of messages) {
         if (msg.key.fromMe) continue;
+        const msgId = msg.key.id;
+        if (msgId && this.processedIds.has(msgId)) continue;
+        if (msgId) this.processedIds.add(msgId);
+
+        // Keep set bounded
+        if (this.processedIds.size > 1000) {
+          const arr = [...this.processedIds];
+          this.processedIds = new Set(arr.slice(-500));
+        }
         // Resolve LID to regular JID
         if (msg.key.remoteJid?.endsWith('@lid') && (msg.key as any).remoteJidAlt) {
           msg.key.remoteJid = (msg.key as any).remoteJidAlt;

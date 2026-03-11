@@ -75,6 +75,7 @@ export interface STTServiceConfig {
   provider: 'google' | 'whisper' | 'deepgram';
   language?: string;                // e.g. 'he-IL', 'en-US' — primary language
   alternative_languages?: string[]; // Google: auto-detect from these + primary
+  forward_audio?: boolean;          // send original audio to webhook along with transcription (default: false)
 }
 
 export interface TTSServiceConfig {

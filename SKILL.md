@@ -1,9 +1,14 @@
 ---
 name: channelkit
-description: Integrate messaging channels (WhatsApp, SMS, Voice, Telegram, Email) with ChannelKit. Use when the user wants to send or receive messages, build chatbots, set up voice IVR, or connect their app to messaging platforms. ChannelKit is a local messaging gateway with MCP tools for channel and service management.
+description: Use whenever the task involves WhatsApp, SMS, Voice calls, Telegram, or Email messaging — whether setting up channels, sending/receiving messages, building chatbots, adding voice/audio responses, configuring TTS/STT, or modifying an existing messaging integration. ChannelKit is a local messaging gateway that handles all messaging features (including built-in TTS, STT, webhooks, and media). Always load this skill before exploring code or installing packages related to messaging.
 ---
 
 # ChannelKit Integration
+
+**CRITICAL RULES — read before doing anything:**
+1. **TTS/STT is built into ChannelKit.** NEVER install TTS or STT packages (google-tts-api, say, espeak, etc.) in the user's app. To enable audio responses, configure TTS on the ChannelKit service — the app just returns `{ "text": "..." }` and ChannelKit converts it to a voice note automatically.
+2. **Use MCP tools, not curl.** If you don't have the ChannelKit MCP tools, ask the user to connect the MCP server. Do not curl the API or read config files directly.
+3. **Do not install ChannelKit** unless the user explicitly asks. It's likely already running.
 
 ChannelKit is a self-hosted messaging gateway. Install it, connect channels, and your app can send/receive messages across WhatsApp, SMS, Voice, Telegram, and Email.
 
@@ -155,7 +160,7 @@ For email, additional fields: `email.subject`, `email.html`, `email.to`, `email.
 ```
 
 - `text` — required, the message text
-- `voice` — set `true` to convert text to speech (for voice channel)
+- `voice` — set `false` to disable TTS for this response. If omitted or `true`, and the service has TTS configured, ChannelKit automatically converts text to audio and sends it as a voice note (WhatsApp, Telegram) or plays it back (Voice). **TTS is a built-in ChannelKit feature — do NOT implement TTS in the app itself.**
 - `media` — optional attachment with URL and mimetype
 - `email` — optional email-specific fields (subject, html body)
 
@@ -220,8 +225,21 @@ Alternatively, set a manual public URL: `set_config("tunnel.public_url", "https:
 
 ### STT/TTS on Services
 
-Configure speech processing per service:
+ChannelKit has **built-in TTS and STT** — the app does NOT need to handle speech conversion itself. Configure TTS/STT on the service and ChannelKit handles it automatically:
+
+- **TTS**: When configured on a service, ChannelKit converts outbound text to audio before sending. On WhatsApp/Telegram this arrives as a voice note. The webhook app just returns `{ "text": "..." }` — no audio processing needed.
+- **STT**: When configured on a service, ChannelKit converts inbound voice messages to text before forwarding to the webhook. The app receives plain text.
+
 ```
+# WhatsApp service with TTS — responses are sent as voice notes
+add_service(
+  name="math-quiz",
+  channel="whatsapp",
+  webhook="http://localhost:3000/quiz",
+  tts={"provider": "google", "language": "en-US"}
+)
+
+# Voice service with both STT and TTS
 add_service(
   name="voice-bot",
   channel="voice",
@@ -233,6 +251,14 @@ add_service(
 
 STT providers: `google`, `whisper`, `deepgram`
 TTS providers: `google`, `elevenlabs`, `openai`
+
+**Each provider requires an API key.** Before configuring TTS/STT, ensure the corresponding key is set via `set_config` (or check `get_status` to see which keys are already configured):
+- Google TTS/STT → `set_config("settings.google_api_key", "...")`
+- OpenAI TTS / Whisper STT → `set_config("settings.openai_api_key", "sk-...")`
+- ElevenLabs TTS → `set_config("settings.elevenlabs_api_key", "...")`
+- Deepgram STT → `set_config("settings.deepgram_api_key", "...")`
+
+If the user hasn't provided an API key, ask them which TTS provider they'd like to use and for the corresponding key.
 
 ### AI Formatting
 

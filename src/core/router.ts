@@ -141,9 +141,9 @@ export class Router {
       const mapping = this.groupStore.get(message.groupId);
       if (mapping) {
         const byName = this.services.get(mapping.serviceName);
-        if (byName) return byName;
+        if (byName && byName.channel === channelName) return byName;
         for (const svc of this.services.values()) {
-          if (svc.webhook === mapping.webhook) return svc;
+          if (svc.webhook === mapping.webhook && svc.channel === channelName) return svc;
         }
       }
     }

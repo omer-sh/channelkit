@@ -261,6 +261,7 @@ export function registerTools(mcp: McpServer, ctx: McpContext): void {
       stt: z.object({
         provider: z.enum(['google', 'whisper', 'deepgram']),
         language: z.string().optional(),
+        forward_audio: z.boolean().optional().describe('Send original audio to webhook along with transcription (default: false)'),
       }).optional().describe('Speech-to-text config'),
       tts: z.object({
         provider: z.enum(['google', 'elevenlabs', 'openai']),
@@ -313,6 +314,7 @@ export function registerTools(mcp: McpServer, ctx: McpContext): void {
       stt: z.object({
         provider: z.enum(['google', 'whisper', 'deepgram']),
         language: z.string().optional(),
+        forward_audio: z.boolean().optional().describe('Send original audio to webhook along with transcription (default: false)'),
       }).optional().describe('New STT config'),
       tts: z.object({
         provider: z.enum(['google', 'elevenlabs', 'openai']),
