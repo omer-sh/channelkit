@@ -18,6 +18,7 @@ import { ChannelKitMcpServer } from './mcp';
 import { Updater } from './core/updater';
 import { setAllowLocalWebhooks } from './core/webhook';
 import { AuthModule } from './auth';
+import { GroupStore } from './core/groupStore';
 
 export class ChannelKit {
   private channels: Channel[] = [];
@@ -25,6 +26,7 @@ export class ChannelKit {
   private router: Router;
   private apiServer: ApiServer;
   private logger: Logger;
+  private groupStore: GroupStore;
   private onboarding?: Onboarding;
   private tunnel?: TunnelManager;
   private tunnelStartedBy: 'cli' | 'dashboard' | null = null;
@@ -59,6 +61,8 @@ export class ChannelKit {
     this.router = new Router(config.services, config.routes, config.channels);
     this.apiServer = new ApiServer(config.apiPort || 4000);
     this.logger = new Logger();
+    this.groupStore = new GroupStore();
+    this.router.setGroupStore(this.groupStore);
 
     if (config.dashboard?.enabled !== false) {
       this.router.setLogger(this.logger);
@@ -182,8 +186,7 @@ export class ChannelKit {
 
     if (onboardingCodes.length > 0) {
       const onboardingConfig = { codes: onboardingCodes };
-      this.onboarding = new Onboarding(onboardingConfig, whatsappChannel, telegramChannel);
-      this.router.setGroupStore(this.onboarding.getGroupStore());
+      this.onboarding = new Onboarding(onboardingConfig, whatsappChannel, telegramChannel, this.groupStore);
       console.log(`[channelkit] Onboarding enabled with ${onboardingCodes.length} service code(s)`);
     }
 

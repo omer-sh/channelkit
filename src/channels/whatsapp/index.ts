@@ -170,9 +170,25 @@ export class WhatsAppChannel extends Channel {
     return code;
   }
 
-  async sendToJid(jid: string, text: string): Promise<void> {
+  async sendToJid(jid: string, text: string, quotedMessageId?: string): Promise<string | undefined> {
+    if (!this.sock) return undefined;
+    if (quotedMessageId) {
+      const quoted = {
+        key: { remoteJid: jid, fromMe: true, id: quotedMessageId },
+        message: { conversation: '' }
+      };
+      const sent = await this.sock.sendMessage(jid, { text }, { quoted });
+      return sent?.key?.id || undefined;
+    }
+    const sent = await this.sock.sendMessage(jid, { text });
+    return sent?.key?.id || undefined;
+  }
+
+  async reactToMessage(jid: string, messageId: string, emoji: string): Promise<void> {
     if (!this.sock) return;
-    await this.sock.sendMessage(jid, { text });
+    await this.sock.sendMessage(jid, {
+      react: { text: emoji, key: { remoteJid: jid, fromMe: true, id: messageId } }
+    });
   }
 
   async connect(): Promise<void> {
@@ -298,6 +314,23 @@ export class WhatsAppChannel extends Channel {
 
         this.emitMessage(unified);
       }
+    });
+
+    this.sock.ev.on('group-participants.update', (event: { id: string; participants: any[]; action: 'add' | 'remove' | 'promote' | 'demote' | 'join' }) => {
+      // Baileys may send participants as strings or objects — normalize to objects
+      const normalized = event.participants.map((p: any) => {
+        if (typeof p === 'string') return { id: p, phoneNumber: p };
+        return { id: p.id || p, phoneNumber: p.phoneNumber || p.id || p };
+      });
+      console.log(`[whatsapp:${this.name}] Group participants update: ${event.action} in ${event.id} — ${normalized.map((p: any) => p.phoneNumber || p.id).join(', ')}`);
+      this.emit('group_update', {
+        groupId: event.id,
+        participants: normalized,
+        action: event.action,
+        channel: 'whatsapp',
+        channelName: this.name,
+        timestamp: Math.floor(Date.now() / 1000),
+      });
     });
   }
 

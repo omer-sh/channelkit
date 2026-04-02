@@ -77,4 +77,37 @@ export function registerGroupRoutes(app: Express, ctx: ServerContext): void {
       res.status(500).json({ error: err.message || 'Failed to create group' });
     }
   });
+
+  /**
+   * GET /api/groups/:channel/:groupId/invite
+   * Get the invite link for an existing WhatsApp group.
+   */
+  app.get('/api/groups/:channel/:groupId/invite', apiSecretCheck(ctx), async (req: any, res: any) => {
+    const { channel: channelName, groupId } = req.params;
+
+    const channel = ctx.channels.get(channelName);
+    if (!channel) {
+      res.status(404).json({ error: `Channel "${channelName}" not found` });
+      return;
+    }
+
+    if (!channel.connected) {
+      res.status(503).json({ error: `Channel "${channelName}" is not connected` });
+      return;
+    }
+
+    if (!(channel instanceof WhatsAppChannel)) {
+      res.status(400).json({ error: `Channel "${channelName}" is not a WhatsApp channel` });
+      return;
+    }
+
+    try {
+      const inviteCode = await channel.groupInviteCode(groupId);
+      const inviteLink = `https://chat.whatsapp.com/${inviteCode}`;
+      res.json({ inviteLink });
+    } catch (err: any) {
+      console.error(`[api] Failed to get invite link for ${groupId}:`, err);
+      res.status(500).json({ error: err.message || 'Failed to get invite link' });
+    }
+  });
 }

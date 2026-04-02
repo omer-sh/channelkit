@@ -1,6 +1,6 @@
 import { Channel } from '../channels/base';
 import { TwilioVoiceChannel } from '../channels/voice';
-import { UnifiedMessage } from './types';
+import { UnifiedMessage, GroupUpdateEvent } from './types';
 import { Logger } from './logger';
 import { Router } from './router';
 import { Onboarding } from '../onboarding';
@@ -318,5 +318,30 @@ export function wireMessageHandler(channel: Channel, deps: MessageHandlerDeps): 
       formatApplied,
       formatOriginalText,
     });
+  });
+
+  // Group participant events → forward to services connected to this channel
+  channel.on('group_update', async (event: GroupUpdateEvent) => {
+    const services = router.getServicesForChannel(event.channelName);
+    if (services.length === 0) return;
+
+    for (const svc of services) {
+      try {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (svc.auth?.type === 'bearer' && svc.auth.token) {
+          headers['Authorization'] = `Bearer ${svc.auth.token}`;
+        } else if (config.api_secret) {
+          headers['Authorization'] = `Bearer ${config.api_secret}`;
+        }
+        const res = await fetch(svc.webhook, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(event),
+        });
+        console.log(`[group_update] Dispatched ${event.action} for ${event.groupId} → ${svc.webhook} (${res.status})`);
+      } catch (err: any) {
+        console.error(`[group_update] Dispatch to ${svc.webhook} failed: ${err.message}`);
+      }
+    }
   });
 }
