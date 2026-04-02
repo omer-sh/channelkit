@@ -871,6 +871,51 @@ To buy a Twilio number and automatically pair it with WhatsApp:
 channelkit channel provision
 ```
 
+## Docker Deployment
+
+A production-ready Docker setup is included in the `docker/` directory with multi-stage builds and auto-restart.
+
+### Build and run
+
+```bash
+docker build -t channelkit -f docker/Dockerfile .
+docker run -d -p 4000:4000 -v channelkit-data:/root/.channelkit channelkit
+```
+
+The volume mount (`channelkit-data`) persists WhatsApp auth sessions, config, and logs across container restarts — you won't need to re-scan the QR code.
+
+### With environment variables
+
+Pass API keys and secrets via environment:
+
+```bash
+docker run -d -p 4000:4000 \
+  -v channelkit-data:/root/.channelkit \
+  -e OPENAI_API_KEY=sk-... \
+  channelkit
+```
+
+### Auto-restart
+
+The entrypoint includes a restart loop — if ChannelKit crashes or is restarted via the dashboard, it automatically restarts inside the container instead of killing it. Auto-update and tunnels are disabled in containers (manage these externally via your CI/CD pipeline and reverse proxy).
+
+### Custom config
+
+To bake a config into the image, copy it during build:
+
+```dockerfile
+COPY my-config.yaml /root/.channelkit/config.yaml
+```
+
+Or mount it at runtime:
+
+```bash
+docker run -d -p 4000:4000 \
+  -v channelkit-data:/root/.channelkit \
+  -v ./config.yaml:/root/.channelkit/config.yaml \
+  channelkit
+```
+
 ## Development
 
 ```bash
